@@ -11,8 +11,8 @@ from time import sleep
 if __name__ == "__main__":
     # Set up camera resolution, MAX is 1920*1080. 
     # The framerate needs to be set to 15 to enable this maximum resolution
-    IM_LENGTH = 1920
-    IM_WIDTH = 1080
+    IM_LENGTH = 480
+    IM_WIDTH = 480
     camera = PiCamera(resolution=(IM_LENGTH, IM_WIDTH), framerate=15)
 
     # Grab reference to the raw capture (3-d RGB Array)
@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     try:
         # Capture an image from camera and write it to the rawCapture
-        for frame1 in camera.capture_continuous(rawCapture, format="gbr", use_video_port=True):
+        for frame1 in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             rgb_image = frame1.array
 
             # height, width, _ = rgb_image.shape
