@@ -11,8 +11,6 @@ bg = None
 # To find the running average over the background
 # dst = (1 - alpha) * dst + alpha * src
 # --------------------------------------------------
-
-
 def run_avg(image, aWeight):
     global bg
     # initialize the background
@@ -122,6 +120,6 @@ if __name__ == "__main__":
         if keypress == ord("q"):
             break
 
-# free up memory
-camera.release()
-cv2.destroyAllWindows()
+    # free up memory
+    camera.release()
+    cv2.destroyAllWindows()
