@@ -33,6 +33,8 @@ def configure_camera(IM_LENGTH=480, IM_WIDTH=480, FRAME_RATE=25):
 # Show Live Video
 # -----------------
 def live_video(camera, rawCapture):
+    capture_index = 0
+
     # Capture an image from camera and write it to the rawCapture
     for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
         bgr_image = frame.array
@@ -43,7 +45,8 @@ def live_video(camera, rawCapture):
         if keypress == 27:
             break
         elif keypress == ord('s'):
-            cv2.imwrite("hand.jpg", bgr_image)
+            cv2.imwrite("./capture/hand_" + str(capture_index) + ".jpg", bgr_image)
+            capture_index += 1
 
         rawCapture.truncate(0)
 

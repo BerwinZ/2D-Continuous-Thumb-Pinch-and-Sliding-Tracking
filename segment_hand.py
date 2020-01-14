@@ -18,8 +18,11 @@ import os
 # -----------------
 def read_images(folder_path):
     imgs = []
+    num = 0
     for file in os.listdir(folder_path):
         imgs.append(cv2.imread(os.path.join(folder_path, file)))
+        num += 1
+    print("Read " + str(num) + " photos")
     return imgs
 
 # -----------------
@@ -46,15 +49,15 @@ def hist_masking(target, hist):
 
     # Filter to smooth the img
     kernel_size = 25
-    disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-    dst = cv2.filter2D(dst, -1, disc)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    mask = cv2.filter2D(dst, -1, kernel)
 
     # Use threshold to make remove more noise
-    _, mask = cv2.threshold(dst, 150, 255, cv2.THRESH_BINARY)
+    _, mask = cv2.threshold(mask, 150, 255, cv2.THRESH_BINARY)
 
     # Erode or dilate the edges that has been removed
-    mask = cv2.erode(dst, None, iterations=5)
-    mask = cv2.dilate(dst, None, iterations=5)
+    mask = cv2.erode(mask, None, iterations=6)
+    mask = cv2.dilate(mask, None, iterations=6)
 
     # Count max area of contour
     # _, contour_list, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -77,7 +80,7 @@ if __name__ == '__main__':
         hand_imgs = read_images('./images')
         hand_hist = generate_histogram(hand_imgs)
 
-        camera, rawCapture = picamera_control.configure_camera()
+        camera, rawCapture = picamera_control.configure_camera(640, 480)
 
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
