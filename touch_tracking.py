@@ -2,7 +2,7 @@
 This script is used to track the touch position
 
 It includes:
-1. Call Otsu threshold to segment the hand part
+1. Call Otsu threshold to segment the hand part and get the contour
 2. Use Convexity Defects to get touch point
 3. Draw the movements in a drawing board
 '''
@@ -13,6 +13,44 @@ from time import sleep
 import picamera_control
 from draw_board import draw_board
 import segment_otsu
+
+
+
+def _get_defect_points(img, max_contour):
+    """Get the two convex defect points
+    
+    Arguments:
+        max_contour {cv2.contour} -- [the contour with the max area]
+    
+    Returns:
+        defect_points [list] -- [left and right defect points]
+    """
+    # In case no contour or the contour area is too small (single fingertip)
+    if max_contour is None or cv2.contourArea(max_contour) < 100000:
+        return None
+
+    # Get the convex defects
+    hull = cv2.convexHull(max_contour, returnPoints=False)
+    defects = cv2.convexityDefects(max_contour, hull)
+
+    # Get the defects with the largest 2 distance
+    sorted_defects = sorted(defects[:, 0], key=lambda x: x[3])
+    if len(sorted_defects) < 2:
+        return None
+
+    defect_points = []
+    for s, e, f, d in sorted_defects[-2:]:
+        start = tuple(max_contour[s][0])
+        end = tuple(max_contour[e][0])
+        far = tuple(max_contour[f][0])
+        defect_points.append(far)
+        cv2.line(img, start, end, [0, 255, 0], 2)
+        cv2.circle(img, far, 5, [0, 0, 255], -1)
+
+    defect_points.sort(key=lambda x: x[0])
+
+    return defect_points
+
 
 
 def get_touch_point(img, max_contour):
@@ -26,34 +64,18 @@ def get_touch_point(img, max_contour):
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
         defectPoints [list] -- [A list of tuple which indicate the coordinate of the defects]
     """
-    if max_contour is None:
-        return None, None
-
-    # Get the convex defects
-    hull = cv2.convexHull(max_contour, returnPoints=False)
-    defects = cv2.convexityDefects(max_contour, hull)
-
-    # Get the defects with the largest 2 distance
-    sorted_defects = sorted(defects[:, 0], key=lambda x: x[3])
-    if len(sorted_defects) < 2:
-        return None, None
-
-    defect_points = []
-    for s, e, f, d in sorted_defects[-2:]:
-        start = tuple(max_contour[s][0])
-        end = tuple(max_contour[e][0])
-        far = tuple(max_contour[f][0])
-        defect_points.append(far)
-        cv2.line(img, start, end, [0, 255, 0], 2)
-        cv2.circle(img, far, 5, [0, 0, 255], -1)
+    defect_points  = _get_defect_points(img, max_contour)
+    if defect_points is None:
+        return None
 
     # Get the touch point
-    defect_points.sort(key=lambda x: x[0])
-    touch_point = ((defect_points[0][0] + defect_points[1][0]) // 2,
+    middle_point = ((defect_points[0][0] + defect_points[1][0]) // 2,
                    (defect_points[0][1] + defect_points[1][1]) // 2)
+
+    touch_point = middle_point
     cv2.circle(img, touch_point, 5, [255, 0, 0], -1)
 
-    return touch_point, defect_points
+    return touch_point
 
 
 initial_touch = None
@@ -101,9 +123,9 @@ if __name__ == '__main__':
         WIDTH, HEIGHT = 640, 480
         camera, rawCapture = picamera_control.configure_camera(WIDTH, HEIGHT)
 
-        hv_board = draw_board(WIDTH, HEIGHT)
-        hor_board = draw_board(WIDTH, HEIGHT)
-        ver_board = draw_board(WIDTH, HEIGHT)
+        hv_board = draw_board(WIDTH, HEIGHT, MAX_POINTS=5)
+        hor_board = draw_board(WIDTH, HEIGHT, MAX_POINTS=5)
+        ver_board = draw_board(WIDTH, HEIGHT, MAX_POINTS=5)
 
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
@@ -115,7 +137,7 @@ if __name__ == '__main__':
             segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
             # Get touch point in the segment image
-            touch_point, _ = get_touch_point(segment, max_contour)
+            touch_point = get_touch_point(segment, max_contour)
 
             if touch_point is not None:
                 # Track the touch point
@@ -139,7 +161,7 @@ if __name__ == '__main__':
             cv2.imshow('V Board', ver_board.board)
 
             # if the user pressed ESC, then stop looping
-            keypress = cv2.waitKey(25) & 0xFF
+            keypress = cv2.waitKey(1) & 0xFF
             if keypress == 27:
                 break
             elif keypress == ord('r'):

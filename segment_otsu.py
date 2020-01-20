@@ -62,7 +62,7 @@ def threshold_masking(img):
                 max_index = idx
 
         max_contour = contours[max_index]
-        
+
         # Draw the max contours area and fill it
         canvas = np.zeros(mask.shape).astype('uint8')
         mask = cv2.drawContours(canvas, contours, max_index, 255, -1)

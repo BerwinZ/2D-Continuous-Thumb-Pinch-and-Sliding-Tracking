@@ -6,15 +6,14 @@ import cv2
 import numpy as np
 
 class draw_board:
-    """Draw board for showing the points
-    """
     def __init__(self, LENGTH=480, WIDTH=480, DIMEN=3, MAX_POINTS=10):
-        """Configure the board
+        """Draw board for showing the points
 
         Keyword Arguments:
             LENGTH {int} -- [description] (default: {480})
             WIDTH {int} -- [description] (default: {480})
             DIMEN {int} -- [description] (default: {3})
+            MAX_POINTS {int} -- [description] (default: {10})
         """
         self.board = np.zeros((WIDTH, LENGTH, DIMEN))
         self.points = []
@@ -39,11 +38,15 @@ class draw_board:
         if len(self.points) > self.max_points:
             cv2.circle(self.board, self.points[0], radius, [0, 0, 0], -1)
             self.points.pop(0)
-    
-        cv2.circle(self.board, tuple(point), radius, color, -1)
+            for p in self.points:
+                cv2.circle(self.board, p, radius, color, -1)
+        else:
+            cv2.circle(self.board, tuple(point), radius, color, -1)
 
 
 if __name__ == '__main__':
+    """Test the draw_board class
+    """
     board = draw_board()
     board.draw_filled_point((0, 0), color=[255, 0, 0])
     board.draw_filled_point((100, 0), color=[0, 255, 0])
