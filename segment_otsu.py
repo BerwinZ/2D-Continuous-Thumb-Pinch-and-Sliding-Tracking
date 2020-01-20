@@ -1,12 +1,16 @@
 '''
-This script is used to segment the hand from the video stream with the skin color
+This script is used to segment the hand from the video stream with the skin color and track the touch position
+
+It includes:
+1. Use Otsu threshold to segment the hand part
+2. Use Convexity Defects to get touch point
+3. Draw the movements in a drawing board
 '''
 
 import cv2
 import numpy as np
 from time import sleep
 import picamera_control
-import draw_board
 
 
 def threshold_masking(img):
@@ -43,106 +47,27 @@ def threshold_masking(img):
     mask = cv2.erode(mask, element)
     mask = cv2.dilate(mask, element)
 
-    # Get the max contours, CHAIN_APPROX_NONE means get all the points
+    # Get the all contours, CHAIN_APPROX_NONE means get all the points
     _, contours, _ = cv2.findContours(
         mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
-    max_index = 0
-    max_val = -1
-    for idx, c in enumerate(contours):
-        if cv2.contourArea(c) > max_val:
-            max_val = cv2.contourArea(c)
-            max_index = idx
+    max_contour = None
 
-    # Draw the max contours and fill it
-    canvas = np.zeros(mask.shape).astype('uint8')
-    mask = cv2.drawContours(canvas, contours, max_index, 255, -1)
+    # Get the contour with max area
+    if len(contours) > 0:
+        max_index = 0
+        max_val = -1
+        for idx, c in enumerate(contours):
+            if cv2.contourArea(c) > max_val:
+                max_val = cv2.contourArea(c)
+                max_index = idx
 
-    return mask, contours[max_index]
+        max_contour = contours[max_index]
+        
+        # Draw the max contours area and fill it
+        canvas = np.zeros(mask.shape).astype('uint8')
+        mask = cv2.drawContours(canvas, contours, max_index, 255, -1)
 
-
-def get_touch_point(img, max_contour):
-    """Extract feature points with the max contour
-
-    Arguments:
-        img {[type]} -- [description]
-        max_contour {[type]} -- [description]
-
-    Returns:
-        touchPoint [tuple] -- [The touch coordinate of the fingertips]
-        defectPoints [list] -- [A list of tuple which indicate the coordinate of the defects]
-    """
-    # Get the convex defects
-    hull = cv2.convexHull(max_contour, returnPoints=False)
-    defects = cv2.convexityDefects(max_contour, hull)
-
-    # Get the defects with the largest 2 distance
-    sorted_defects = sorted(defects[:, 0], key=lambda x: x[3])
-    if len(sorted_defects) < 2:
-        return None, None
-
-    defect_points = []
-    for s, e, f, d in sorted_defects[-2:]:
-        start = tuple(max_contour[s][0])
-        end = tuple(max_contour[e][0])
-        far = tuple(max_contour[f][0])
-        defect_points.append(far)
-        cv2.line(img, start, end, [0, 255, 0], 2)
-        cv2.circle(img, far, 5, [0, 0, 255], -1)
-
-    # Get the touch point
-    defect_points.sort(key=lambda x: x[0])
-    touch_point = ((defect_points[0][0] + defect_points[1][0]) // 2,
-                   (defect_points[0][1] + defect_points[1][1]) // 2)
-    cv2.circle(img, touch_point, 5, [255, 0, 0], -1)
-
-    return touch_point, defect_points
-
-
-def draw_points(frame, points):
-    """Draw points circles in the frame
-
-    Arguments:
-        frame {np.array} -- Image
-        points {list} -- Points need to be drawn
-    """
-    for p in points:
-        cv2.circle(frame, tuple(p), 1, [0, 0, 255], -1)
-
-
-old_touch_point = None
-
-
-def reset_tracking(point):
-    """Reset the old touch point
-
-    Arguments:
-        point {[type]} -- [description]
-    """
-    global old_touch_point
-    old_touch_point = point
-
-
-def track_touch_point(point):
-    """Canculate the relative movements of current touch points to the old touch points
-
-    Arguments:
-        point {tuple} -- [description]
-
-    Returns:
-        [type] -- [description]
-    """
-    global old_touch_point
-
-    if old_touch_point == None:
-        old_touch_point = point
-        return 0, 0
-
-    horizonal = point[0] - old_touch_point[0]
-    vertical = point[1] - old_touch_point[1]
-
-    # TODO: Should include some filter part here
-
-    return horizonal, vertical
+    return mask, max_contour
 
 
 if __name__ == '__main__':
@@ -151,8 +76,6 @@ if __name__ == '__main__':
     """
     try:
         camera, rawCapture = picamera_control.configure_camera(640, 480)
-        hor_board = draw_board.configure_board(640, 480)
-        ver_board = draw_board.configure_board(640, 480)
 
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
@@ -167,35 +90,17 @@ if __name__ == '__main__':
 
             # Apply the mask to the image
             segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
-            # cv2.drawContours(segment, [max_contour], 0, [0, 0, 255])
-
-            # Get touch point in the segment image
-            touch_point, _ = get_touch_point(segment, max_contour)
-
-            if touch_point != None:
-                # Track the touch point
-                hor, ver = track_touch_point(touch_point)
-                k = 1
-                draw_board.draw_point(hor_board,
-                                      (int(-hor * k + bgr_image.shape[1] / 2), int(bgr_image.shape[0] / 2)), 30)
-                draw_board.draw_point(ver_board,
-                                      (int(bgr_image.shape[1] / 2), int(ver * k + bgr_image.shape[0] / 2)), 30)
+            cv2.drawContours(segment, [max_contour], 0, [0, 0, 255])
 
             # Display
             cv2.imshow("original", bgr_image)
             cv2.imshow('Mask', mask)
             cv2.imshow('Segment', segment)
-            cv2.imshow('H Board', hor_board)
-            cv2.imshow('V Board', ver_board)
 
             # if the user pressed ESC, then stop looping
             keypress = cv2.waitKey(25) & 0xFF
             if keypress == 27:
                 break
-            elif keypress == ord('r'):
-                reset_tracking(touch_point)
-                hor_board = draw_board.reset_board(hor_board)
-                ver_board = draw_board.reset_board(ver_board)
 
             rawCapture.truncate(0)
 

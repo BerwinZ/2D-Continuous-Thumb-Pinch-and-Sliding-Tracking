@@ -25,7 +25,7 @@ def reset_board(board):
     return board
 
 
-def draw_point(board, point, radius=5, color=[255, 0, 0]):
+def draw_point(board, point, radius=10, color=[255, 0, 0]):
     """Draw points on the board
 
     Arguments:
@@ -37,6 +37,8 @@ def draw_point(board, point, radius=5, color=[255, 0, 0]):
 
 if __name__ == '__main__':
     board = configure_board()
+    draw_point(board, (0, 0), color=[255, 0, 0])
+    draw_point(board, (100, 0), color=[0, 255, 0])
     cv2.imshow("Board", board)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
