@@ -13,12 +13,15 @@ from picamera import PiCamera
 from time import sleep
 
 
-# -----------------
-# Set up camera resolution, MAX is 1920*1080. (Optional 1080*720, 640*480).
-# The framerate needs to be set to 15 to enable this maximum resolution
-# Also get the reference for raw data
-# -----------------
 def configure_camera(IM_LENGTH=480, IM_WIDTH=480, FRAME_RATE=25):
+    """Set up camera resolution, framerate and get the reference for raw data
+
+    Max resolution is 1920*1080. (Optional 1080*720, 640*480). 
+    The framerate needs to be set to 15 to enable this maximum resolution
+
+    Returns:
+        PiCamera, PiRGBArray
+    """
     camera = PiCamera(resolution=(IM_LENGTH, IM_WIDTH), framerate=FRAME_RATE)
 
     # Grab reference to the raw capture (3-d RGB Array)
@@ -29,10 +32,14 @@ def configure_camera(IM_LENGTH=480, IM_WIDTH=480, FRAME_RATE=25):
 
     return camera, rawCapture
 
-# -----------------
-# Show Live Video
-# -----------------
+
 def live_video(camera, rawCapture):
+    """Show Live Video
+
+    Arguments:
+        camera {PiCamera}
+        rawCapture {PiGRBArray}
+    """
     capture_index = 0
 
     # Capture an image from camera and write it to the rawCapture
@@ -45,7 +52,8 @@ def live_video(camera, rawCapture):
         if keypress == 27:
             break
         elif keypress == ord('s'):
-            cv2.imwrite("./capture/hand_" + str(capture_index) + ".jpg", bgr_image)
+            cv2.imwrite("./capture/hand_" +
+                        str(capture_index) + ".jpg", bgr_image)
             capture_index += 1
 
         rawCapture.truncate(0)
@@ -55,6 +63,9 @@ def live_video(camera, rawCapture):
 
 
 if __name__ == "__main__":
+    """
+    Get the rawcapture of pi camera and show the live video
+    """
     try:
         camera, rawCapture = configure_camera()
         live_video(camera, rawCapture)

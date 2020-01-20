@@ -13,10 +13,16 @@ from time import sleep
 import picamera_control
 import os
 
-# -----------------
-# Read images
-# -----------------
-def read_images(folder_path):
+
+def read_images(folder_path: str):
+    """Read hand images from folder
+    
+    Arguments:
+        folder_path {str} -- Folder path include the hand images
+    
+    Returns:
+        list -- imgs
+    """
     imgs = []
     num = 0
     for file in os.listdir(folder_path):
@@ -25,10 +31,16 @@ def read_images(folder_path):
     print("Read " + str(num) + " photos")
     return imgs
 
-# -----------------
-# Generate the histogram for hand images
-# -----------------
-def generate_histogram(img_list):
+
+def generate_histogram(img_list: list):
+    """Generate the histogram for hand images
+    
+    Arguments:
+        img_list {list} -- Hands images
+    
+    Returns:
+        2-d array -- The histogram of H and S channels
+    """
     # Convert to HSV space
     hsv_imgs = []
     for im in img_list:
@@ -39,10 +51,16 @@ def generate_histogram(img_list):
     return cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX)
 
 
-# -----------------
-# Use histogram backprojection to get mask for target image
-# -----------------
 def hist_masking(target, hist):
+    """Use histogram backprojection to get mask for target image
+    
+    Arguments:
+        target {np.array} -- Image of a frame
+        hist {np.array} -- Histogram of H and S channels 
+    
+    Returns:
+        np.array -- Mask
+    """
     # Get the backprojection result
     target_hsv = cv2.cvtColor(target, cv2.COLOR_BGR2HSV)
     dst = cv2.calcBackProject([target_hsv], [0, 1], hist, [0, 180, 0, 256], 1)
@@ -76,6 +94,9 @@ def hist_masking(target, hist):
 
 
 if __name__ == '__main__':
+    """This function read hands images from folder, then generate histogram for the H and S channels.
+    Then use the histogram to backproject and get the mask
+    """
     try:
         hand_imgs = read_images('./images')
         hand_hist = generate_histogram(hand_imgs)
