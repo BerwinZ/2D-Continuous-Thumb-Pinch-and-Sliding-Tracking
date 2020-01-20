@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 class draw_board:
-    def __init__(self, LENGTH=480, WIDTH=480, DIMEN=3, MAX_POINTS=10):
+    def __init__(self, WIDTH=480, HEIGHT=480, DIMEN=3, MAX_POINTS=10):
         """Draw board for showing the points
 
         Keyword Arguments:
@@ -15,7 +15,7 @@ class draw_board:
             DIMEN {int} -- [description] (default: {3})
             MAX_POINTS {int} -- [description] (default: {10})
         """
-        self.board = np.zeros((WIDTH, LENGTH, DIMEN))
+        self.board = np.zeros((HEIGHT, WIDTH, DIMEN))
         self.points = []
         self.max_points = MAX_POINTS
 
