@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 from time import sleep
 import picamera_control
-import draw_board
+from draw_board import draw_board
 import segment_otsu
 
 
@@ -26,7 +26,7 @@ def get_touch_point(img, max_contour):
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
         defectPoints [list] -- [A list of tuple which indicate the coordinate of the defects]
     """
-    if (max_contour == None).any() :
+    if max_contour is None:
         return None, None
 
     # Get the convex defects
@@ -100,9 +100,10 @@ if __name__ == '__main__':
     try:
         WIDTH, HEIGHT = 640, 480
         camera, rawCapture = picamera_control.configure_camera(WIDTH, HEIGHT)
-        hv_board = draw_board.configure_board(WIDTH, HEIGHT)
-        hor_board = draw_board.configure_board(WIDTH, HEIGHT)
-        ver_board = draw_board.configure_board(WIDTH, HEIGHT)
+
+        hv_board = draw_board(WIDTH, HEIGHT)
+        hor_board = draw_board(WIDTH, HEIGHT)
+        ver_board = draw_board(WIDTH, HEIGHT)
 
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
@@ -116,36 +117,36 @@ if __name__ == '__main__':
             # Get touch point in the segment image
             touch_point, _ = get_touch_point(segment, max_contour)
 
-            if touch_point != None:
+            if touch_point is not None:
                 # Track the touch point
                 dx, dy = calculate_movements(touch_point)
-                center_x, center_y = hor_board.shape[1] / \
-                    2, hor_board.shape[0] / 2
+                center_x, center_y = WIDTH / 2, HEIGHT / 2
                 k = 1
-                draw_board.draw_point(hor_board,
-                                      (int(-dx * k + center_x), int(center_y)), 30)
-                draw_board.draw_point(ver_board,
-                                      (int(center_x), int(dy * k + center_y)), 30)
-                draw_board.draw_point(hv_board,
-                                      (int(-dx * k + center_x), int(dy * k + center_y)), 30)
+                size = 10
+                hor_board.draw_filled_point(
+                    (int(-dx * k + center_x), int(center_y)), size)
+                ver_board.draw_filled_point(
+                    (int(center_x), int(dy * k + center_y)), size)
+                hv_board.draw_filled_point(
+                    (int(-dx * k + center_x), int(dy * k + center_y)), size)
 
             # Display
             # cv2.imshow("original", bgr_image)
             # cv2.imshow('Mask', mask)
             cv2.imshow('Segment', segment)
-            cv2.imshow('HV Board', hv_board)
-            cv2.imshow('H Board', hor_board)
-            cv2.imshow('V Board', ver_board)
+            cv2.imshow('HV Board', hv_board.board)
+            cv2.imshow('H Board', hor_board.board)
+            cv2.imshow('V Board', ver_board.board)
 
             # if the user pressed ESC, then stop looping
-            keypress=cv2.waitKey(25) & 0xFF
+            keypress = cv2.waitKey(25) & 0xFF
             if keypress == 27:
                 break
             elif keypress == ord('r'):
                 reset_tracking(touch_point)
-                hv_board = draw_board.reset_board(hv_board)
-                hor_board = draw_board.reset_board(hor_board)
-                ver_board = draw_board.reset_board(ver_board)
+                hv_board.reset_board()
+                hor_board.reset_board()
+                ver_board.reset_board()
 
             rawCapture.truncate(0)
 
