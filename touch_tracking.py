@@ -16,7 +16,7 @@ from draw_board import draw_board
 import segment_otsu
 
 
-def _get_defect_points(img, max_contour):
+def _get_defect_points(img, max_contour, VALID_CNT_AREA = 0):
     """Get the two convex defect points
 
     Arguments:
@@ -26,7 +26,7 @@ def _get_defect_points(img, max_contour):
         defect_points [list] -- [left and right defect points]
     """
     # In case no contour or the contour area is too small (single fingertip)
-    if max_contour is None or cv2.contourArea(max_contour) < 100000:
+    if max_contour is None or cv2.contourArea(max_contour) < VALID_CNT_AREA:
         return None
 
     # Get the convex defects
@@ -52,7 +52,7 @@ def _get_defect_points(img, max_contour):
     return defect_points
 
 
-def get_touch_point(img, max_contour):
+def get_touch_point(img, max_contour, VALID_CNT_AREA = 0, kalman_filter=None):
     """Extract feature points with the max contour
 
     Arguments:
@@ -63,15 +63,22 @@ def get_touch_point(img, max_contour):
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
         defectPoints [list] -- [A list of tuple which indicate the coordinate of the defects]
     """
-    defect_points = _get_defect_points(img, max_contour)
+    defect_points = _get_defect_points(img, max_contour, VALID_CNT_AREA)
     if defect_points is None:
         return None
 
     # Get the touch point
-    middle_point = ((defect_points[0][0] + defect_points[1][0]) // 2,
-                    (defect_points[0][1] + defect_points[1][1]) // 2)
+    middle_point = ((defect_points[0][0] + defect_points[1][0]) / 2,
+                    (defect_points[0][1] + defect_points[1][1]) / 2)
 
-    touch_point = middle_point
+    raw_touch_point = (int(middle_point[0]), int(middle_point[1]))
+    cv2.circle(img, raw_touch_point, 5, [0, 255, 0], -1)
+
+    # Adopt kalman filter here
+    if kalman_filter is not None:
+        kalman_filter.correct(np.array([[np.float32(middle_point[0])], [np.float32(middle_point[1])]]))
+        middle_point = kalman_filter.predict()
+    touch_point = (int(middle_point[0]), int(middle_point[1]))
     cv2.circle(img, touch_point, 5, [255, 0, 0], -1)
 
     return touch_point
@@ -123,16 +130,34 @@ def calculate_movements(point):
     dy = _scaler(point[1], [base_point[int(point_type.MIN_Y)], -
                             MAX_UNIT], [base_point[int(point_type.MAX_Y)], MAX_UNIT])
 
-    # TODO: Should include some filter part here
-
     return dx, dy
 
 
 def _scaler(value, min_base_target, max_base_target):
+    """Project value from [min_base, max_base] to [min_target, max_target]
+    
+    Arguments:
+        value {float} -- [description]
+        min_base_target {list} -- [min_base, min_target]
+        max_base_target {list} -- [max_base, max_target]
+    
+    Returns:
+        value -- [projected value]
+    """
     min_base, min_target = min_base_target
     max_base, max_target = max_base_target
     return (value - min_base) / (max_base - min_base) * (max_target - min_target) + min_target
 
+
+def configure_kalman_filter():
+    # 4：状态数，包括（x，y，dx，dy）坐标及速度（每次移动的距离）；2：观测量，能看到的是坐标值
+    kalman = cv2.KalmanFilter(4, 2) 
+    kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32) 
+    kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) 
+    # 系统过程噪声协方差
+    kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)*0.03 
+
+    return kalman
 
 if __name__ == '__main__':
     """
@@ -140,11 +165,14 @@ if __name__ == '__main__':
     """
     try:
         WIDTH, HEIGHT = 640, 480
-        camera, rawCapture = picamera_control.configure_camera(WIDTH, HEIGHT)
+        camera, rawCapture = picamera_control.configure_camera(WIDTH, HEIGHT, FRAME_RATE=50)
 
-        hv_board = draw_board(WIDTH, HEIGHT, MAX_POINTS=5)
-        hor_board = draw_board(WIDTH, HEIGHT, MAX_POINTS=1)
-        ver_board = draw_board(WIDTH, HEIGHT, MAX_POINTS=1)
+        kalman_filter = configure_kalman_filter()
+
+        DR_WIDTH, DR_HEIGHT = 320, 320
+        hv_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=5)
+        hor_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=1)
+        ver_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=1)
 
         print("To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN")
 
@@ -157,8 +185,8 @@ if __name__ == '__main__':
             # Apply the mask to the image
             segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
-            # Get touch point in the segment image
-            touch_point = get_touch_point(segment, max_contour)
+            # Get touch from the contour and draw points in the segment image
+            touch_point = get_touch_point(segment, max_contour, VALID_CNT_AREA=100000, kalman_filter=kalman_filter)
 
             if touch_point is not None:
                 # Track the touch point
@@ -176,10 +204,8 @@ if __name__ == '__main__':
             cv2.imshow('HV Board', hv_board.board)
             H_V_joint = np.concatenate(
                 (hor_board.board, ver_board.board), axis=1)
-            
-            ## TODO: Draw a white line
-            cv2.line(H_V_joint, (0, H_V_joint.shape[1] // 2),
-                     (H_V_joint.shape[0], H_V_joint.shape[1] // 2), [255, 255, 255], 5)
+            cv2.line(H_V_joint, (H_V_joint.shape[1] // 2, 0),
+                     (H_V_joint.shape[1] // 2, H_V_joint.shape[0]), [255, 255, 255], 3)
             cv2.imshow('H V Movement', H_V_joint)
 
             # if the user pressed ESC, then stop looping
