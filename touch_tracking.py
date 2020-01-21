@@ -329,6 +329,7 @@ if __name__ == '__main__':
 
         # Kalman filter to remove noise from the point movement
         kalman_filter = configure_kalman_filter()
+        kalman_filter_on = True
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         tracker = point_trakcer()
@@ -340,6 +341,7 @@ if __name__ == '__main__':
         ver_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=1)
 
         print("To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN")
+        print("Press F to turn ON/OFF the kalman filter")
 
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
@@ -351,8 +353,12 @@ if __name__ == '__main__':
             segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
             # Get touch from the contour and draw points in the segment image
-            touch_point = get_touch_point(
-                contour, CNT_AREA_THRES=100000, kalman_filter=kalman_filter, draw_img=segment)
+            if kalman_filter_on:
+                touch_point = get_touch_point(
+                    contour, CNT_AREA_THRES=100000, kalman_filter=kalman_filter, draw_img=segment)
+            else:
+                touch_point = get_touch_point(
+                    contour, CNT_AREA_THRES=100000, kalman_filter=None, draw_img=segment)
 
             if touch_point is not None:
                 # Track the touch point
@@ -386,6 +392,13 @@ if __name__ == '__main__':
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
+            elif keypress == ord('f'):
+                kalman_filter_on = not kalman_filter_on
+                if kalman_filter_on:
+                    print("Kalman Filter ON")
+                else:
+                    print("Kalman Filter OFF")
+
 
             rawCapture.truncate(0)
 
