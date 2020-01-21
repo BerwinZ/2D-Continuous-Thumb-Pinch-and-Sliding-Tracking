@@ -219,11 +219,15 @@ if __name__ == '__main__':
 
             # Display
             cv2.imshow('Segment', segment)
-            cv2.imshow('HV Board', hv_board.board)
+
             H_V_joint = np.concatenate(
-                (hor_board.board, ver_board.board), axis=1)
-            cv2.line(H_V_joint, (H_V_joint.shape[1] // 2, 0),
-                     (H_V_joint.shape[1] // 2, H_V_joint.shape[0]), [255, 255, 255], 3)
+                (hv_board.board, hor_board.board, ver_board.board), axis=1)
+
+            joint_width, joint_height = H_V_joint.shape[1], H_V_joint.shape[0]
+            cv2.line(H_V_joint, (joint_width // 3, 0),
+                     (joint_width // 3, joint_height), [255, 255, 255], 3)
+            cv2.line(H_V_joint, (joint_width * 2 // 3, 0),
+                     (joint_width * 2 // 3, joint_height), [255, 255, 255], 3)
             cv2.imshow('H V Movement', H_V_joint)
 
             # if the user pressed ESC, then stop looping
