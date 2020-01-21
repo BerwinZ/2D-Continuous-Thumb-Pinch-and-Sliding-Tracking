@@ -2,9 +2,10 @@
 This script is used to track the touch position
 
 It includes:
-1. Call Otsu threshold to segment the hand part and get the contour
-2. Use Convexity Defects to get touch point
-3. Draw the movements in a drawing board
+1. Call Otsu threshold to segment the hand part and get the contour of hand
+2. Use Convexity Defects to get feature points from the contour
+3. Calculate the middle point and use Kalman filter to correct it
+4. Draw the relative movements in a drawing board
 '''
 
 import cv2
@@ -150,12 +151,17 @@ def _scaler(value, min_base_target, max_base_target):
 
 
 def configure_kalman_filter():
-    # 4：状态数，包括（x，y，dx，dy）坐标及速度（每次移动的距离）；2：观测量，能看到的是坐标值
+    """Configure the kalman filter
+    
+    Returns:
+        [type] -- [description]
+    """
+    # State number: 4, including (x，y，dx，dy) (position and velocity)
+    # Measurement number: 2, (x, y) (position)
     kalman = cv2.KalmanFilter(4, 2) 
     kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32) 
     kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) 
-    # 系统过程噪声协方差
-    kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)*0.03 
+    kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 0.03 
 
     return kalman
 
