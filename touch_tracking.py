@@ -163,16 +163,11 @@ if __name__ == '__main__':
             if touch_point is not None:
                 # Track the touch point
                 dx, dy = calculate_movements(touch_point)
-                center_x, center_y = hv_board.board.shape[1] / \
-                    2, hv_board.board.shape[0] / 2
                 k = 1
                 size = 10
-                hor_board.draw_filled_point(
-                    (int(-dx * k + center_x), int(center_y)), size)
-                ver_board.draw_filled_point(
-                    (int(center_x), int(dy * k + center_y)), size)
-                hv_board.draw_filled_point(
-                    (int(-dx * k + center_x), int(dy * k + center_y)), size)
+                hor_board.draw_filled_point((-dx * k, 0), radius=size)
+                ver_board.draw_filled_point((0, dy * k), radius=size)
+                hv_board.draw_filled_point((-dx * k, dy * k), radius=size)
 
             # Display
             # cv2.imshow("original", bgr_image)

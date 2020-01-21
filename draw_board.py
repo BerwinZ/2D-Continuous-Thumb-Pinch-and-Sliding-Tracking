@@ -15,6 +15,8 @@ class draw_board:
             DIMEN {int} -- [description] (default: {3})
             MAX_POINTS {int} -- [description] (default: {10})
         """
+        self.width = WIDTH
+        self.height = HEIGHT
         self.board = np.zeros((HEIGHT, WIDTH, DIMEN))
         self.points = []
         self.max_points = MAX_POINTS
@@ -27,21 +29,30 @@ class draw_board:
         self.points = []
 
 
-    def draw_filled_point(self, point, radius=10, color=[255, 0, 0]):
+    def draw_filled_point(self, point, middle=True, radius=10, color=[255, 0, 0]):
         """Draw points on the board
-
+        
         Arguments:
             point {[type]} -- [description]
-            color {[type]} -- [description]
+        
+        Keyword Arguments:
+            middle {bool} -- [description] (default: {True})
+            radius {int} -- [description] (default: {10})
+            color {list} -- [description] (default: {[255, 0, 0]})
         """
-        self.points.append(point)
+        if middle:
+            new_point = (int(point[0] + self.width / 2), int(point[1] + self.height / 2))
+        else:
+            new_point = tuple(point)
+        self.points.append(new_point)
+
         if len(self.points) > self.max_points:
             cv2.circle(self.board, self.points[0], radius, [0, 0, 0], -1)
             self.points.pop(0)
             for p in self.points:
                 cv2.circle(self.board, p, radius, color, -1)
         else:
-            cv2.circle(self.board, tuple(point), radius, color, -1)
+            cv2.circle(self.board, new_point, radius, color, -1)
 
 
 if __name__ == '__main__':
