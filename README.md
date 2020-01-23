@@ -16,7 +16,7 @@ This repo is used to track the thumb's touch position relatived to other fintert
 | picamera_control.py | configure the pi camera and get raw image data (BGR) |
 | segment_hbp.py | segment the hand part from the image with histogram backprojection method |
 | segment_otsu.py | segment the hand part from the image with otsu thresholding method |
-| touch_tracking.py | track the touch point with the contour of segmented hand |
+| tracking_convdef.py | track the touch point with the contour of segmented hand |
 | draw_board.py | draw points in a board to indicate the movements |
 | main.py | TBD |
 

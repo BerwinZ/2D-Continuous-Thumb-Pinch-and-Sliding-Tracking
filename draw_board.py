@@ -44,15 +44,22 @@ class draw_board:
             new_point = (int(point[0] + self.width / 2), int(point[1] + self.height / 2))
         else:
             new_point = tuple(point)
+    
         self.points.append(new_point)
 
         if len(self.points) > self.max_points:
-            cv2.circle(self.board, self.points[0], radius, [0, 0, 0], -1)
+            if self._IsValid(self.points[0]):
+                cv2.circle(self.board, self.points[0], radius, [0, 0, 0], -1)
             self.points.pop(0)
             for p in self.points:
-                cv2.circle(self.board, p, radius, color, -1)
+                if self._IsValid(p):
+                    cv2.circle(self.board, p, radius, color, -1)
         else:
-            cv2.circle(self.board, new_point, radius, color, -1)
+            if self._IsValid(new_point):
+                cv2.circle(self.board, new_point, radius, color, -1)
+
+    def _IsValid(self, point):
+        return 0 <= point[0] < self.width and 0 <= point[1] < self.height
 
 
 if __name__ == '__main__':
