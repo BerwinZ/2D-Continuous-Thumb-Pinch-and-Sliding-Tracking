@@ -2,7 +2,7 @@
 This script is used to track the touch position
 
 It includes:
-1. Call Otsu threshold to segment the hand part and get the contour of hand
+1. Call Otsu threshold to finger_image the hand part and get the contour of hand
 2. Use Convexity Defects to get feature points from the contour
 3. Calculate the middle point and use Kalman filter to correct it
 4. Draw the relative movements in a drawing board
@@ -17,17 +17,17 @@ import segment_otsu
 from relative_mov_tracker import point_trakcer
 
 
-def _get_defect_points(contour, CNT_AREA_THRES=0, draw_img=None):
+def __get_defect_points(contour, MIN_CHECK_AREA=0):
     """Get the two convex defect points
 
     Arguments:
-        contour {cv2.contour} -- [the contour with the max area]
+        contour {cv2.contour} -- [the contour of the finger]
 
     Returns:
-        defect_points [list] -- [left and right defect points]
+        defect_points [list of tuple] -- [left and right defect points]
     """
     # In case no contour or the contour area is too small (single fingertip)
-    if contour is None or cv2.contourArea(contour) < CNT_AREA_THRES:
+    if contour is None or cv2.contourArea(contour) < MIN_CHECK_AREA:
         return None
 
     # Get the convex defects
@@ -41,20 +41,17 @@ def _get_defect_points(contour, CNT_AREA_THRES=0, draw_img=None):
 
     defect_points = []
     for s, e, f, d in sorted_defects[-2:]:
-        start = tuple(contour[s][0])
-        end = tuple(contour[e][0])
+        # start = tuple(contour[s][0])
+        # end = tuple(contour[e][0])
         far = tuple(contour[f][0])
         defect_points.append(far)
-        if draw_img is not None:
-            cv2.line(draw_img, start, end, [0, 255, 0], 2)
-            cv2.circle(draw_img, far, 5, [0, 255, 0], -1)
-
+        
     defect_points.sort(key=lambda x: x[0])
 
     return defect_points
 
 
-def _calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slope=0):
+def __calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slope=0):
     """Get the max gradient in the slope direction and within the distance
 
     Arguments:
@@ -78,14 +75,14 @@ def _calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slop
     if vertical:
         # Let column(x) to be fixed and change the row(y)
         for dy in range(int(-distance / 2), int(distance / 2)):
-            if _IsValid(x, y + dy + 1, gray_img) and _IsValid(x, y + dy, gray_img) and abs(gray_img[y + dy + 1, x] - gray_img[y + dy, x]) > max_grad:
+            if __IsValid(x, y + dy + 1, gray_img) and __IsValid(x, y + dy, gray_img) and abs(gray_img[y + dy + 1, x] - gray_img[y + dy, x]) > max_grad:
                 max_grad = abs(gray_img[y + dy + 1, x] - gray_img[y + dy, x])
                 grad_x, grad_y = x, y + dy
     else:
         last_x, last_y = x, y
         c_x, c_y = x, y
         # up
-        while _IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
             if abs(gray_img[c_y, c_x] - gray_img[last_y, last_x]) > max_grad:
                 max_grad = abs(gray_img[c_y, c_x] - gray_img[last_y, last_x])
                 grad_x, grad_y = c_x, c_y
@@ -96,7 +93,7 @@ def _calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slop
         last_x, last_y = x, y
         c_x, c_y = x, y
         # down
-        while _IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
             if abs(gray_img[c_y, c_x] - gray_img[last_y, last_x]) > max_grad:
                 max_grad = abs(gray_img[c_y, c_x] - gray_img[last_y, last_x])
                 grad_x, grad_y = c_x, c_y
@@ -111,7 +108,7 @@ def _calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slop
         return (grad_x, grad_y)
 
 
-def _get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
+def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     """Get the min gray in the slope direction and within the distance
 
     Arguments:
@@ -135,13 +132,13 @@ def _get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     if vertical:
         # Let column(x) to be fixed and change the row(y)
         for dy in range(int(-distance / 2), int(distance / 2)):
-            if _IsValid(x, y + dy, gray_img) and gray_img[y + dy, x] < min_gray:
+            if __IsValid(x, y + dy, gray_img) and gray_img[y + dy, x] < min_gray:
                 min_gray = gray_img[y + dy, x]
                 grad_x, grad_y = x, y + dy
     else:
         c_x, c_y = x, y
         # up
-        while _IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
                 grad_x, grad_y = c_x, c_y
@@ -150,7 +147,7 @@ def _get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
 
         c_x, c_y = x, y
         # down
-        while _IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
                 grad_x, grad_y = c_x, c_y
@@ -164,7 +161,7 @@ def _get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
         return (grad_x, grad_y)
 
 
-def _IsValid(x, y, img):
+def __IsValid(x, y, img):
     """Check whether x and y is in the boundary of img
 
     Arguments:
@@ -179,59 +176,61 @@ def _IsValid(x, y, img):
     return 0 <= x < width and 0 <= y < height
 
 
-def get_touch_point(max_contour, CNT_AREA_THRES=0, kalman_filter=None, draw_img=None):
+def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, kalman_filter=None, DRAW_POINTS=True):
     """Extract feature points with the max contour
 
     Arguments:
-        draw_img {np.array} -- [Target image to draw the results. The segmented image]
-        max_contour {cv2.contour} -- [Parameter to generate the touch point]
+        finger_contour {cv2.contour} -- [Parameter to generate the touch point]
+        finger_img {np.array} -- [BGR Image of fingers]
 
     Returns:
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
-        defectPoints [list] -- [A list of tuple which indicate the coordinate of the defects]
+        defectPoints [list of tuple] -- [A list of tuple which indicate the coordinate of the defects]
     """
     # Get the convex defects point
-    defect_points = _get_defect_points(max_contour, CNT_AREA_THRES, draw_img)
+    defect_points = __get_defect_points(finger_contour, MIN_CHECK_AREA)
+
     if defect_points is None:
-        return None
+        return None, None
 
     # Calculate the middle point
-    middle_point = ((defect_points[0][0] + defect_points[1][0]) // 2,
-                    (defect_points[0][1] + defect_points[1][1]) // 2)
+    (x1, y1), (x2, y2) = defect_points
+    middle_point = ((x1 + x2) // 2, (y1 + y2) // 2)
 
     # Calculate the touch point according to the gradient change
-    if draw_img is None:
-        touch_point = middle_point
+    gray_img = cv2.cvtColor(finger_img, cv2.COLOR_BGR2GRAY)
+    search_distance = np.sqrt(
+        np.sum(np.square(np.array(defect_points[0]) - np.array(defect_points[1])))) / 5
+
+    if abs(y2 - y1) < 1e-6:
+        touch_point = __get_min_gray(
+            gray_img, middle_point, distance=search_distance, vertical=True)
     else:
-        gray_img = cv2.cvtColor(draw_img, cv2.COLOR_BGR2GRAY)
-        search_distance = np.sqrt(
-            np.sum(np.square(np.array(defect_points[0]) - np.array(defect_points[1])))) / 5
+        grad_direc = - (x2 - x1) / (y2 - y1)
+        touch_point = __get_min_gray(
+            gray_img, middle_point, distance=search_distance, vertical=False, slope=grad_direc)
 
-        if abs(defect_points[1][1] - defect_points[0][1]) < 1e-6:
-            grad_direc = 0
-            touch_point = _get_min_gray(
-                gray_img, middle_point, distance=search_distance, vertical=True)
-        else:
-            grad_direc = -(defect_points[1][0] - defect_points[0]
-                           [0]) / (defect_points[1][1] - defect_points[0][1])
-            touch_point = _get_min_gray(
-                gray_img, middle_point, distance=search_distance, vertical=False, slope=grad_direc)
+    # If kalman filter adopted, use it to correct the observation
+    filter_touch_point = None
+    if kalman_filter is not None:
+        kalman_filter.correct(
+            np.array([[np.float32(touch_point[0])], [np.float32(touch_point[1])]]))
+        predict_point = kalman_filter.predict()
+        filter_touch_point = (int(predict_point[0]), int(predict_point[1]))
 
-        cv2.circle(draw_img, touch_point, 5, [0, 0, 255], -1)
+    if DRAW_POINTS:
+        # Two defect points (Green)
+        cv2.circle(finger_img, defect_points[0], 5, [0, 255, 0], -1)
+        cv2.circle(finger_img, defect_points[1], 5, [0, 255, 0], -1)
+        # Raw touch point (Red)
+        cv2.circle(finger_img, touch_point, 5, [0, 0, 255], -1)
+        # Filter touch point (Blue)
+        if filter_touch_point is not None:
+            cv2.circle(finger_img, filter_touch_point, 5, [255, 0, 0], -1)
 
-    # Adopt kalman filter to the touch point
-    if kalman_filter is None:
-        return touch_point
+    final_touch_point = touch_point if kalman_filter is None else filter_touch_point
 
-    kalman_filter.correct(
-        np.array([[np.float32(touch_point[0])], [np.float32(touch_point[1])]]))
-    predict_point = kalman_filter.predict()
-    filter_touch_point = (int(predict_point[0]), int(predict_point[1]))
-
-    if draw_img is not None:
-        cv2.circle(draw_img, filter_touch_point, 5, [255, 0, 0], -1)
-
-    return filter_touch_point
+    return final_touch_point, defect_points
 
 
 def configure_kalman_filter():
@@ -252,11 +251,31 @@ def configure_kalman_filter():
 
     return kalman
 
-
+def segment_diff_fingers(contour, defect_points, touch_point):
+    up_finger   = contour.copy()
+    down_finger = contour.copy()
+    to_add = np.reshape(touch_point, [1, 1, 2])
+    (x1, y1), (x2, y2) = defect_points
+    
+    if abs(x2 - x1) < 1e-6:
+        up_finger = np.delete(up_finger, np.where(up_finger[:, 0, 0] > x1), axis=0)
+        down_finger = np.delete(down_finger, np.where(down_finger[:, 0, 0] < x1), axis=0)
+    else:
+        grad_direc = (y2 - y1) / (x2 - x1)
+        offset = y1 - grad_direc * x1
+        up_finger = np.delete(up_finger, np.where(grad_direc * up_finger[:, 0, 0] + offset - up_finger[:, 0, 1] < 0), axis=0)
+        down_finger = np.delete(down_finger, np.where(grad_direc * down_finger[:, 0, 0] + offset - down_finger[:, 0, 1] > 0), axis=0)
+    
+    index = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
+    if index is not None:
+        up_finger = np.insert(up_finger, index, to_add, axis=0)
+    down_finger = np.concatenate((down_finger, to_add), axis=0)
+    
+    return up_finger, down_finger
 
 if __name__ == '__main__':
     """
-    This function get the frame from the camera, and use thresholding to segment the hand part
+    This function get the frame from the camera, and use thresholding to finger_image the hand part
     """
     try:
         WIDTH, HEIGHT = 640, 480
@@ -266,16 +285,16 @@ if __name__ == '__main__':
 
         # Kalman filter to remove noise from the point movement
         kalman_filter = configure_kalman_filter()
-        kalman_filter_on = True
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         tracker = point_trakcer()
 
         # Drawing boards
+        mov_scaler = 1
         DR_WIDTH, DR_HEIGHT = 320, 320
-        hv_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=5)
-        hor_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=1)
-        ver_board = draw_board(DR_WIDTH, DR_HEIGHT, MAX_POINTS=1)
+        hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
+        hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        ver_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
 
         print("To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN")
         print("Press F to turn ON/OFF the kalman filter")
@@ -283,32 +302,34 @@ if __name__ == '__main__':
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
 
-            # Get the mask using the Otsu thresholding method
+            # Get the mask and its contour using the Otsu thresholding method and apply the mask
             mask, contour = segment_otsu.threshold_masking(bgr_image)
+            finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
+            two_finger_image = finger_image.copy()
 
-            # Apply the mask to the image
-            segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
-
-            # Get touch from the contour and draw points in the segment image
-            if kalman_filter_on:
-                touch_point = get_touch_point(
-                    contour, CNT_AREA_THRES=100000, kalman_filter=kalman_filter, draw_img=segment)
-            else:
-                touch_point = get_touch_point(
-                    contour, CNT_AREA_THRES=100000, kalman_filter=None, draw_img=segment)
+            # Get touch point and defect points from the contour and draw points in the finger_image image
+            touch_point, defect_points = get_touch_point(
+                contour, finger_image, MIN_CHECK_AREA=100000, kalman_filter=kalman_filter, DRAW_POINTS=True)
 
             if touch_point is not None:
                 # Track the touch point
                 dx, dy = tracker.calculate_movements(touch_point)
-                k = 1
-                point_size = 10
-                hor_board.draw_filled_point((-dx * k, 0), radius=point_size)
-                ver_board.draw_filled_point((0, dy * k), radius=point_size)
-                hv_board.draw_filled_point(
-                    (-dx * k, dy * k), radius=point_size)
+                
+                # Draw the touch point track
+                hor_board.draw_filled_point((-dx * mov_scaler, 0))
+                ver_board.draw_filled_point((0, dy * mov_scaler))
+                hv_board.draw_filled_point((-dx * mov_scaler, dy * mov_scaler))
+                
+                # Segment the two fingers
+                up_finger_contour, down_finger_contour = segment_diff_fingers(contour, defect_points, touch_point)
+                
+                cv2.drawContours(two_finger_image, [up_finger_contour], 0, [0, 0, 255], 3)
+                cv2.drawContours(two_finger_image, [down_finger_contour], 0, [255, 0, 0], 3)
+                
 
             # Display
-            cv2.imshow('Segment', segment)
+            cv2.imshow('Finger', finger_image)
+            cv2.imshow('2 Fingers Segment', two_finger_image)
 
             H_V_joint = np.concatenate(
                 (hv_board.board, hor_board.board, ver_board.board), axis=1)
@@ -330,12 +351,12 @@ if __name__ == '__main__':
                 hor_board.reset_board()
                 ver_board.reset_board()
             elif keypress == ord('f'):
-                kalman_filter_on = not kalman_filter_on
-                if kalman_filter_on:
+                if kalman_filter is None:
+                    kalman_filter = configure_kalman_filter()
                     print("Kalman Filter ON")
                 else:
+                    kalman_filter = None
                     print("Kalman Filter OFF")
-
 
             rawCapture.truncate(0)
 
