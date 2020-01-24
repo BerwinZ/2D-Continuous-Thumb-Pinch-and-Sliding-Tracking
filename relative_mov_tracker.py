@@ -39,6 +39,9 @@ class point_trakcer:
             dx {float} -- [relative movement in x direction]
             dy {float}  -- [relative movement in y direction]
         """
+        if point is None:
+            return None, None
+
         MAX_UNIT = 100
 
         dx = self._scaler(point[0], [self.base_point[int(point_type.MIN_X)], -

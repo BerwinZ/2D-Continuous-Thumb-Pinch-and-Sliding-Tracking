@@ -18,18 +18,19 @@ from relative_mov_tracker import point_trakcer
 import sys, traceback
 
 
-def __get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
+def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
     """Get the two convex defect points
 
     Arguments:
         contour {cv2.contour} -- [the contour of the finger]
 
     Returns:
-        defect_points [list of tuple] -- [left and right defect points]
+        defect_points [list of tuple] -- [(left_x, left_y), (right_x, right_y)]
+        hull_line [list of tuple] -- [(start1, end1), (start2, end2)]
     """
     # In case no contour or the contour area is too small (single fingertip)
     if contour is None or cv2.contourArea(contour) < MIN_CHECK_AREA:
-        return None
+        return None, None
 
     # Get the convex defects
     hull = cv2.convexHull(contour, returnPoints=False)
@@ -37,23 +38,27 @@ def __get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
 
     # Get the defects with the largest 2 distance
     if defects is None:
-        return None
+        return None, None
     defects = defects[defects[:, 0, 3] > MIN_DEFECT_DISTANCE]
     if defects.shape[0] < 2:
-        return None
+        return None, None
 
     sorted_defects = sorted(defects[:, 0, :], key=lambda x: x[3])
 
     defect_points = []
+    hull_lines = []
     for s, e, f, d in sorted_defects[-2:]:
-        # start = tuple(contour[s][0])
-        # end = tuple(contour[e][0])
+        start = tuple(contour[s][0])
+        end = tuple(contour[e][0])
         far = tuple(contour[f][0])
         defect_points.append(far)
-        
-    defect_points.sort(key=lambda x: x[0])
+        hull_lines.append((start, end))
+    
+    if defect_points[0][0] > defect_points[1][0]:
+        defect_points[0], defect_points[1] = defect_points[1], defect_points[0]
+        hull_lines[0], hull_lines[1] = hull_lines[1], hull_lines[0]
 
-    return defect_points
+    return defect_points, hull_lines
 
 
 def __calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slope=0):
@@ -198,7 +203,7 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DIS
         defectPoints [list of tuple] -- [A list of tuple which indicate the coordinate of the defects]]
     """
     # Get the convex defects point
-    defect_points = __get_defect_points(finger_contour, MIN_CHECK_AREA, MIN_DEFECT_DISTANCE)
+    defect_points, _ = get_defect_points(finger_contour, MIN_CHECK_AREA, MIN_DEFECT_DISTANCE)
 
     if defect_points is None:
         return None, None
@@ -332,7 +337,6 @@ if __name__ == '__main__':
             touch_point, defect_points = get_touch_point(
                 contour, finger_image, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000, kalman_filter=kalman_filter, DRAW_POINTS=True)
 
-            
             if touch_point is not None:
                 # Track the touch point
                 dx, dy = tracker.calculate_movements(touch_point)
@@ -352,7 +356,15 @@ if __name__ == '__main__':
                 defect_points = np.sqrt(
                     np.sum(np.square(np.array(defect_points[0]) - np.array(defect_points[1]))))
                 print(cv2.contourArea(up_finger_contour), cv2.contourArea(down_finger_contour), defect_points)
-                
+            
+            _, hull_line = get_defect_points(contour, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000)
+            if hull_line is not None:
+                (start1, end1), (start2, end2) = hull_line
+                cv2.circle(finger_image, start1, 5, [0, 0, 255], -1)
+                cv2.circle(finger_image, end1,   5, [31, 144, 248], -1)
+                cv2.circle(finger_image, start2, 5, [48, 237, 245], -1)
+                cv2.circle(finger_image, end2,   5, [75, 175, 33], -1)
+
 
             # Display
             cv2.imshow('Finger', finger_image)
