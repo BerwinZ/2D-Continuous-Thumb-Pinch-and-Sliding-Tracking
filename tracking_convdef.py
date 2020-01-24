@@ -18,7 +18,7 @@ from relative_mov_tracker import point_trakcer
 import sys, traceback
 
 
-def __get_defect_points(contour, MIN_CHECK_AREA=0):
+def __get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
     """Get the two convex defect points
 
     Arguments:
@@ -36,9 +36,13 @@ def __get_defect_points(contour, MIN_CHECK_AREA=0):
     defects = cv2.convexityDefects(contour, hull)
 
     # Get the defects with the largest 2 distance
-    sorted_defects = sorted(defects[:, 0], key=lambda x: x[3])
-    if len(sorted_defects) < 2:
+    if defects is None:
         return None
+    defects = defects[defects[:, 0, 3] > MIN_DEFECT_DISTANCE]
+    if defects.shape[0] < 2:
+        return None
+
+    sorted_defects = sorted(defects[:, 0, :], key=lambda x: x[3])
 
     defect_points = []
     for s, e, f, d in sorted_defects[-2:]:
@@ -177,7 +181,7 @@ def __IsValid(x, y, img):
     return 0 <= x < width and 0 <= y < height
 
 
-def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, kalman_filter=None, DRAW_POINTS=True):
+def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0, kalman_filter=None, DRAW_POINTS=True):
     """Extract feature points with the max contour
 
     Arguments:
@@ -194,7 +198,7 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, kalman_filter=
         defectPoints [list of tuple] -- [A list of tuple which indicate the coordinate of the defects]]
     """
     # Get the convex defects point
-    defect_points = __get_defect_points(finger_contour, MIN_CHECK_AREA)
+    defect_points = __get_defect_points(finger_contour, MIN_CHECK_AREA, MIN_DEFECT_DISTANCE)
 
     if defect_points is None:
         return None, None
@@ -282,8 +286,7 @@ def segment_diff_fingers(contour, defect_points, touch_point):
     
     index1 = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
     if index1 is not None and len(index1) != 0:
-        print(index1[-1])
-        up_finger = np.insert(up_finger, index1[-1], to_add, axis=0)
+        up_finger = np.insert(up_finger, index1[-1] + 1, to_add, axis=0)
 
     down_finger = np.insert(down_finger, down_finger.shape[0], to_add, axis=0)
     
@@ -327,8 +330,9 @@ if __name__ == '__main__':
 
             # Get touch point and defect points from the contour and draw points in the finger_image image
             touch_point, defect_points = get_touch_point(
-                contour, finger_image, MIN_CHECK_AREA=100000, kalman_filter=kalman_filter, DRAW_POINTS=True)
+                contour, finger_image, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000, kalman_filter=kalman_filter, DRAW_POINTS=True)
 
+            
             if touch_point is not None:
                 # Track the touch point
                 dx, dy = tracker.calculate_movements(touch_point)
@@ -344,6 +348,10 @@ if __name__ == '__main__':
                 cv2.drawContours(two_finger_image, [up_finger_contour], 0, [0, 0, 255], 3)
                 cv2.drawContours(two_finger_image, [down_finger_contour], 0, [255, 0, 0], 3)
                 cv2.circle(two_finger_image, touch_point, 5, [255, 0, 0], -1)
+
+                defect_points = np.sqrt(
+                    np.sum(np.square(np.array(defect_points[0]) - np.array(defect_points[1]))))
+                print(cv2.contourArea(up_finger_contour), cv2.contourArea(down_finger_contour), defect_points)
                 
 
             # Display
