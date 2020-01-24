@@ -11,6 +11,7 @@ import numpy as np
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from time import sleep
+import sys, traceback
 
 
 def configure_camera(IM_LENGTH=480, IM_WIDTH=480, FRAME_RATE=25):
@@ -70,6 +71,9 @@ if __name__ == "__main__":
         camera, rawCapture = configure_camera()
         live_video(camera, rawCapture)
     except Exception as e:
-        print(e)
         camera.close()
         cv2.destroyAllWindows()
+        print("Exception in user code:")
+        print('-'*60)
+        traceback.print_exc(file=sys.stdout)
+        print('-'*60)

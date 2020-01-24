@@ -12,6 +12,8 @@ import numpy as np
 from time import sleep
 import picamera_control
 import os
+import sys, traceback
+
 
 
 def read_images(folder_path: str):
@@ -126,3 +128,7 @@ if __name__ == '__main__':
         print(e)
         camera.close()
         cv2.destroyAllWindows()
+        print("Exception in user code:")
+        print('-'*60)
+        traceback.print_exc(file=sys.stdout)
+        print('-'*60)

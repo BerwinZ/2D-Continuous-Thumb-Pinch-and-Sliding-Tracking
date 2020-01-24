@@ -11,6 +11,8 @@ import cv2
 import numpy as np
 from time import sleep
 import picamera_control
+import sys, traceback
+
 
 
 def threshold_masking(img):
@@ -24,7 +26,7 @@ def threshold_masking(img):
 
     Returns:
         Mask [np.array] -- [0/255 Mask]
-        Max_contour [3-d array] 
+        Contour [3-d array] -- [The contour of the mask] 
     """
     # Convert to YCrCb
     img_ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCR_CB)
@@ -107,6 +109,9 @@ if __name__ == '__main__':
         camera.close()
         cv2.destroyAllWindows()
     except Exception as e:
-        print(e)
         camera.close()
         cv2.destroyAllWindows()
+        print("Exception in user code:")
+        print('-'*60)
+        traceback.print_exc(file=sys.stdout)
+        print('-'*60)

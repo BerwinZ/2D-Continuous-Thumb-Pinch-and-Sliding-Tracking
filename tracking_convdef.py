@@ -15,6 +15,7 @@ import picamera_control
 from draw_board import draw_board
 import segment_otsu
 from relative_mov_tracker import point_trakcer
+import sys, traceback
 
 
 def __get_defect_points(contour, MIN_CHECK_AREA=0):
@@ -170,7 +171,7 @@ def __IsValid(x, y, img):
         img {[type]} -- [description]
 
     Returns:
-        [type] -- [description]
+        flag [bool] -- [description]
     """
     height, width = img.shape[0], img.shape[1]
     return 0 <= x < width and 0 <= y < height
@@ -183,9 +184,14 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, kalman_filter=
         finger_contour {cv2.contour} -- [Parameter to generate the touch point]
         finger_img {np.array} -- [BGR Image of fingers]
 
+    Keyword Arguments:
+        MIN_CHECK_AREA {int} -- [description] (default: {0})
+        kalman_filter {[type]} -- [description] (default: {None})
+        DRAW_POINTS {bool} -- [description] (default: {True})
+
     Returns:
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
-        defectPoints [list of tuple] -- [A list of tuple which indicate the coordinate of the defects]
+        defectPoints [list of tuple] -- [A list of tuple which indicate the coordinate of the defects]]
     """
     # Get the convex defects point
     defect_points = __get_defect_points(finger_contour, MIN_CHECK_AREA)
@@ -237,7 +243,7 @@ def configure_kalman_filter():
     """Configure the kalman filter
 
     Returns:
-        [type] -- [description]
+        kalman_filter [cv2.KalmanFilter]
     """
     # State number: 4, including (x，y，dx，dy) (position and velocity)
     # Measurement number: 2, (x, y) (position)
@@ -252,24 +258,34 @@ def configure_kalman_filter():
     return kalman
 
 def segment_diff_fingers(contour, defect_points, touch_point):
-    up_finger   = contour.copy()
-    down_finger = contour.copy()
+    """Segment the contour to the up finger and down finger
+    
+    Arguments:
+        contour {[type]} -- [description]
+        defect_points {[type]} -- [description]
+        touch_point {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
     to_add = np.reshape(touch_point, [1, 1, 2])
     (x1, y1), (x2, y2) = defect_points
     
     if abs(x2 - x1) < 1e-6:
-        up_finger = np.delete(up_finger, np.where(up_finger[:, 0, 0] > x1), axis=0)
-        down_finger = np.delete(down_finger, np.where(down_finger[:, 0, 0] < x1), axis=0)
+        up_finger = contour[contour[:, 0, 0] <= x1]
+        down_finger = contour[contour[:, 0, 0] >= x1]
     else:
         grad_direc = (y2 - y1) / (x2 - x1)
         offset = y1 - grad_direc * x1
-        up_finger = np.delete(up_finger, np.where(grad_direc * up_finger[:, 0, 0] + offset - up_finger[:, 0, 1] < 0), axis=0)
-        down_finger = np.delete(down_finger, np.where(grad_direc * down_finger[:, 0, 0] + offset - down_finger[:, 0, 1] > 0), axis=0)
+        up_finger = contour[grad_direc * contour[:, 0, 0] + offset - contour[:, 0, 1] >= 0]
+        down_finger = contour[grad_direc * contour[:, 0, 0] + offset - contour[:, 0, 1] <= 0]
     
-    index = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
-    if index is not None:
-        up_finger = np.insert(up_finger, index, to_add, axis=0)
-    down_finger = np.concatenate((down_finger, to_add), axis=0)
+    index1 = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
+    if index1 is not None and len(index1) != 0:
+        print(index1[-1])
+        up_finger = np.insert(up_finger, index1[-1], to_add, axis=0)
+
+    down_finger = np.insert(down_finger, down_finger.shape[0], to_add, axis=0)
     
     return up_finger, down_finger
 
@@ -296,13 +312,15 @@ if __name__ == '__main__':
         hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
         ver_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
 
+        print('-'*60)
         print("To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN")
         print("Press F to turn ON/OFF the kalman filter")
+        print('-'*60)
 
         for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
             bgr_image = frame.array
 
-            # Get the mask and its contour using the Otsu thresholding method and apply the mask
+            # Get the mask and its contour using the Otsu thresholding method and apply the mask to image
             mask, contour = segment_otsu.threshold_masking(bgr_image)
             finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
             two_finger_image = finger_image.copy()
@@ -325,6 +343,7 @@ if __name__ == '__main__':
                 
                 cv2.drawContours(two_finger_image, [up_finger_contour], 0, [0, 0, 255], 3)
                 cv2.drawContours(two_finger_image, [down_finger_contour], 0, [255, 0, 0], 3)
+                cv2.circle(two_finger_image, touch_point, 5, [255, 0, 0], -1)
                 
 
             # Display
@@ -363,6 +382,9 @@ if __name__ == '__main__':
         camera.close()
         cv2.destroyAllWindows()
     except Exception as e:
-        print(e)
         camera.close()
         cv2.destroyAllWindows()
+        print("Exception in user code:")
+        print('-'*60)
+        traceback.print_exc(file=sys.stdout)
+        print('-'*60)
