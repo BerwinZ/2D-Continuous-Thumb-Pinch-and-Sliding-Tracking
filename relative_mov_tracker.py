@@ -21,6 +21,9 @@ class point_trakcer:
         Arguments:
             point {[type]} -- [description]
         """
+        if point is None:
+            return
+
         if self.cur_point_type == point_type.MIN_X or self.cur_point_type == point_type.MAX_X:
             self.base_point[int(self.cur_point_type)] = point[0]
         else:
@@ -29,7 +32,7 @@ class point_trakcer:
         print("Current base points", self.base_point)
         self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
 
-    def calculate_movements(self, point):
+    def calculate_scale_rela_move(self, point, MOVE_SCALE_RANGE = 1):
         """Canculate the relative movements of current touch points to the old touch points
 
         Arguments:
@@ -42,12 +45,10 @@ class point_trakcer:
         if point is None:
             return None, None
 
-        MAX_UNIT = 100
-
         dx = self._scaler(point[0], [self.base_point[int(point_type.MIN_X)], -
-                                     MAX_UNIT], [self.base_point[int(point_type.MAX_X)], MAX_UNIT])
+                                     MOVE_SCALE_RANGE], [self.base_point[int(point_type.MAX_X)], MOVE_SCALE_RANGE])
         dy = self._scaler(point[1], [self.base_point[int(point_type.MIN_Y)], -
-                                     MAX_UNIT], [self.base_point[int(point_type.MAX_Y)], MAX_UNIT])
+                                     MOVE_SCALE_RANGE], [self.base_point[int(point_type.MAX_Y)], MOVE_SCALE_RANGE])
 
         return dx, dy
 

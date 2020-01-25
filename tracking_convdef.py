@@ -39,6 +39,8 @@ def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
     # Get the defects with the largest 2 distance
     if defects is None:
         return None, None
+    
+    # Filter the defects with threshold
     defects = defects[defects[:, 0, 3] > MIN_DEFECT_DISTANCE]
     if defects.shape[0] < 2:
         return None, None
@@ -60,64 +62,6 @@ def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
 
     return defect_points, hull_lines
 
-
-def __calculate_max_gradient(gray_img, start_pos, distance=0, vertical=True, slope=0):
-    """Get the max gradient in the slope direction and within the distance
-
-    Arguments:
-        gray_img {[type]} -- [description]
-        start_pos {[type]} -- [description]
-
-    Keyword Arguments:
-        distance {int} -- [description] (default: {0})
-        vertical {bool} -- [description] (default: {True})
-        slope {int} -- [description] (default: {0})
-
-    Returns:
-        point_max_gradient {tuple} -- [description]
-    """
-    # x is from left to right, related to width
-    # y is from up to down, related to height
-    x, y = start_pos
-    max_grad = -1
-    grad_x, grad_y = 0, 0
-
-    if vertical:
-        # Let column(x) to be fixed and change the row(y)
-        for dy in range(int(-distance / 2), int(distance / 2)):
-            if __IsValid(x, y + dy + 1, gray_img) and __IsValid(x, y + dy, gray_img) and abs(gray_img[y + dy + 1, x] - gray_img[y + dy, x]) > max_grad:
-                max_grad = abs(gray_img[y + dy + 1, x] - gray_img[y + dy, x])
-                grad_x, grad_y = x, y + dy
-    else:
-        last_x, last_y = x, y
-        c_x, c_y = x, y
-        # up
-        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
-            if abs(gray_img[c_y, c_x] - gray_img[last_y, last_x]) > max_grad:
-                max_grad = abs(gray_img[c_y, c_x] - gray_img[last_y, last_x])
-                grad_x, grad_y = c_x, c_y
-            last_x, last_y = c_x, c_y
-            c_x = c_x + 1
-            c_y = int(c_y + 1 * slope)
-
-        last_x, last_y = x, y
-        c_x, c_y = x, y
-        # down
-        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
-            if abs(gray_img[c_y, c_x] - gray_img[last_y, last_x]) > max_grad:
-                max_grad = abs(gray_img[c_y, c_x] - gray_img[last_y, last_x])
-                grad_x, grad_y = c_x, c_y
-            last_x, last_y = c_x, c_y
-            c_x = c_x - 1
-            c_y = int(c_y - 1 * slope)
-
-    # Check the ans
-    if max_grad == -1:
-        return start_pos
-    else:
-        return (grad_x, grad_y)
-
-
 def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     """Get the min gray in the slope direction and within the distance
 
@@ -138,6 +82,12 @@ def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     x, y = start_pos
     min_gray = 255
     grad_x, grad_y = 0, 0
+
+    def __IsValid(x, y, img):
+        """Check whether x and y is in the boundary of img
+        """
+        height, width = img.shape[0], img.shape[1]
+        return 0 <= x < width and 0 <= y < height
 
     if vertical:
         # Let column(x) to be fixed and change the row(y)
@@ -171,21 +121,6 @@ def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
         return (grad_x, grad_y)
 
 
-def __IsValid(x, y, img):
-    """Check whether x and y is in the boundary of img
-
-    Arguments:
-        x {[type]} -- [description]
-        y {[type]} -- [description]
-        img {[type]} -- [description]
-
-    Returns:
-        flag [bool] -- [description]
-    """
-    height, width = img.shape[0], img.shape[1]
-    return 0 <= x < width and 0 <= y < height
-
-
 def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0, kalman_filter=None, DRAW_POINTS=True):
     """Extract feature points with the max contour
 
@@ -202,6 +137,9 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DIS
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
         defectPoints [list of tuple] -- [A list of tuple which indicate the coordinate of the defects]]
     """
+    if finger_contour is None or finger_img is None:
+        return None, None
+
     # Get the convex defects point
     defect_points, _ = get_defect_points(finger_contour, MIN_CHECK_AREA, MIN_DEFECT_DISTANCE)
 
@@ -266,7 +204,7 @@ def configure_kalman_filter():
 
     return kalman
 
-def segment_diff_fingers(contour, defect_points, touch_point):
+def segment_diff_fingers(contour, defect_points, touch_point=None):
     """Segment the contour to the up finger and down finger
     
     Arguments:
@@ -277,6 +215,9 @@ def segment_diff_fingers(contour, defect_points, touch_point):
     Returns:
         [type] -- [description]
     """
+    if contour is None or defect_points is None:
+        return None, None
+
     to_add = np.reshape(touch_point, [1, 1, 2])
     (x1, y1), (x2, y2) = defect_points
     
@@ -289,13 +230,30 @@ def segment_diff_fingers(contour, defect_points, touch_point):
         up_finger = contour[grad_direc * contour[:, 0, 0] + offset - contour[:, 0, 1] >= 0]
         down_finger = contour[grad_direc * contour[:, 0, 0] + offset - contour[:, 0, 1] <= 0]
     
-    index1 = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
-    if index1 is not None and len(index1) != 0:
-        up_finger = np.insert(up_finger, index1[-1] + 1, to_add, axis=0)
+    if touch_point is not None:
+        index1 = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
+        if index1 is not None and len(index1) != 0:
+            up_finger = np.insert(up_finger, index1[-1] + 1, to_add, axis=0)
 
-    down_finger = np.insert(down_finger, down_finger.shape[0], to_add, axis=0)
+        down_finger = np.insert(down_finger, down_finger.shape[0], to_add, axis=0)
     
     return up_finger, down_finger
+
+def draw_vertical_lines(img, line_num=0):
+    """Draw white vertical lines in img
+    
+    Arguments:
+        img {[type]} -- [description]
+        line_num {[type]} -- [description]
+    """
+    if img is None:
+        return
+
+    width, height = img.shape[1], img.shape[0]
+
+    for i in range(line_num):
+        cv2.line(img, (width // (line_num + 1) * (i + 1), 0),
+                (width // (line_num + 1) * (i + 1), height), [255, 255, 255], 3)
 
 if __name__ == '__main__':
     """
@@ -314,7 +272,7 @@ if __name__ == '__main__':
         tracker = point_trakcer()
 
         # Drawing boards
-        mov_scaler = 1
+        DRAW_SCALER = 0.5
         DR_WIDTH, DR_HEIGHT = 320, 320
         hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
         hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
@@ -337,47 +295,35 @@ if __name__ == '__main__':
             touch_point, defect_points = get_touch_point(
                 contour, finger_image, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000, kalman_filter=kalman_filter, DRAW_POINTS=True)
 
-            if touch_point is not None:
-                # Track the touch point
-                dx, dy = tracker.calculate_movements(touch_point)
-                
-                # Draw the touch point track
-                hor_board.draw_filled_point((-dx * mov_scaler, 0))
-                ver_board.draw_filled_point((0, dy * mov_scaler))
-                hv_board.draw_filled_point((-dx * mov_scaler, dy * mov_scaler))
-                
-                # Segment the two fingers
-                up_finger_contour, down_finger_contour = segment_diff_fingers(contour, defect_points, touch_point)
-                
+            # Track the touch point
+            dx, dy = tracker.calculate_scale_rela_move(touch_point, MOVE_SCALE_RANGE=100)
+
+            # Draw the touch point track
+            if dx is not None:
+                dx = - dx * DRAW_SCALER
+                dy = dy * DRAW_SCALER
+            hor_board.draw_filled_point((dx, 0))
+            ver_board.draw_filled_point((0, dy))
+            hv_board.draw_filled_point((dx, dy))
+            
+            # Segment the two fingers
+            up_finger_contour, down_finger_contour = segment_diff_fingers(contour, defect_points, touch_point)
+            
+            if up_finger_contour is not None:
                 cv2.drawContours(two_finger_image, [up_finger_contour], 0, [0, 0, 255], 3)
                 cv2.drawContours(two_finger_image, [down_finger_contour], 0, [255, 0, 0], 3)
-                cv2.circle(two_finger_image, touch_point, 5, [255, 0, 0], -1)
-
-                defect_points = np.sqrt(
-                    np.sum(np.square(np.array(defect_points[0]) - np.array(defect_points[1]))))
-                print(cv2.contourArea(up_finger_contour), cv2.contourArea(down_finger_contour), defect_points)
             
-            _, hull_line = get_defect_points(contour, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000)
-            if hull_line is not None:
-                (start1, end1), (start2, end2) = hull_line
-                cv2.circle(finger_image, start1, 5, [0, 0, 255], -1)
-                cv2.circle(finger_image, end1,   5, [31, 144, 248], -1)
-                cv2.circle(finger_image, start2, 5, [48, 237, 245], -1)
-                cv2.circle(finger_image, end2,   5, [75, 175, 33], -1)
-
-
+            if touch_point is not None:
+                cv2.circle(two_finger_image, touch_point, 5, [255, 0, 0], -1)
+            
             # Display
-            cv2.imshow('Finger', finger_image)
-            cv2.imshow('2 Fingers Segment', two_finger_image)
+            finger_image_joint = np.concatenate((finger_image, two_finger_image), axis=1)
+            draw_vertical_lines(finger_image_joint, 1)
+            cv2.imshow('Finger', finger_image_joint)
 
             H_V_joint = np.concatenate(
                 (hv_board.board, hor_board.board, ver_board.board), axis=1)
-
-            joint_width, joint_height = H_V_joint.shape[1], H_V_joint.shape[0]
-            cv2.line(H_V_joint, (joint_width // 3, 0),
-                     (joint_width // 3, joint_height), [255, 255, 255], 3)
-            cv2.line(H_V_joint, (joint_width * 2 // 3, 0),
-                     (joint_width * 2 // 3, joint_height), [255, 255, 255], 3)
+            draw_vertical_lines(H_V_joint, 2)
             cv2.imshow('H V Movement', H_V_joint)
 
             # if the user pressed ESC, then stop looping

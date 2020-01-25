@@ -40,12 +40,14 @@ class draw_board:
             middle {bool} -- [description] (default: {True})
             color {list} -- [description] (default: {[255, 0, 0]})
         """
-        if middle:
-            new_point = (int(point[0] + self.width / 2), int(point[1] + self.height / 2))
+        if point[0] is None or point[1] is None:
+            self.points.append(None)
         else:
-            new_point = tuple(point)
-    
-        self.points.append(new_point)
+            if middle:
+                new_point = (int(point[0] + self.width / 2), int(point[1] + self.height / 2))
+            else:
+                new_point = tuple(point)
+            self.points.append(new_point)
 
         if len(self.points) > self.max_points:
             if self._IsValid(self.points[0]):
@@ -55,11 +57,11 @@ class draw_board:
                 if self._IsValid(p):
                     cv2.circle(self.board, p, self.radius, color, -1)
         else:
-            if self._IsValid(new_point):
+            if self._IsValid(self.points[-1]):
                 cv2.circle(self.board, new_point, self.radius, color, -1)
 
     def _IsValid(self, point):
-        return 0 <= point[0] < self.width and 0 <= point[1] < self.height
+        return point is not None and 0 <= point[0] < self.width and 0 <= point[1] < self.height
 
 
 if __name__ == '__main__':
