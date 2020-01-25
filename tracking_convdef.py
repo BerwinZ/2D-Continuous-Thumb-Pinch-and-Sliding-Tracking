@@ -3,64 +3,21 @@ This script is used to track the touch position
 
 It includes:
 1. Call Otsu threshold to finger_image the hand part and get the contour of hand
-2. Use Convexity Defects to get feature points from the contour
-3. Calculate the middle point and use Kalman filter to correct it
+2. Get 2 Convexity Defects with largest distance from the contour
+3. Calculate the middle point of convexity defects, find the touch point and use Kalman filter to correct it
 4. Draw the relative movements in a drawing board
 '''
 
 import cv2
 import numpy as np
 from time import sleep
+import sys
+import traceback
 import picamera_control
-from draw_board import draw_board
-import segment_otsu
+from draw_board import draw_board, draw_vertical_lines
+from segment_otsu import threshold_masking
 from relative_mov_tracker import point_trakcer
-import sys, traceback
 
-
-def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
-    """Get the two convex defect points
-
-    Arguments:
-        contour {cv2.contour} -- [the contour of the finger]
-
-    Returns:
-        defect_points [list of tuple] -- [(left_x, left_y), (right_x, right_y)]
-        hull_line [list of tuple] -- [(start1, end1), (start2, end2)]
-    """
-    # In case no contour or the contour area is too small (single fingertip)
-    if contour is None or cv2.contourArea(contour) < MIN_CHECK_AREA:
-        return None, None
-
-    # Get the convex defects
-    hull = cv2.convexHull(contour, returnPoints=False)
-    defects = cv2.convexityDefects(contour, hull)
-
-    # Get the defects with the largest 2 distance
-    if defects is None:
-        return None, None
-    
-    # Filter the defects with threshold
-    defects = defects[defects[:, 0, 3] > MIN_DEFECT_DISTANCE]
-    if defects.shape[0] < 2:
-        return None, None
-
-    sorted_defects = sorted(defects[:, 0, :], key=lambda x: x[3])
-
-    defect_points = []
-    hull_lines = []
-    for s, e, f, d in sorted_defects[-2:]:
-        start = tuple(contour[s][0])
-        end = tuple(contour[e][0])
-        far = tuple(contour[f][0])
-        defect_points.append(far)
-        hull_lines.append((start, end))
-    
-    if defect_points[0][0] > defect_points[1][0]:
-        defect_points[0], defect_points[1] = defect_points[1], defect_points[0]
-        hull_lines[0], hull_lines[1] = hull_lines[1], hull_lines[0]
-
-    return defect_points, hull_lines
 
 def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     """Get the min gray in the slope direction and within the distance
@@ -92,13 +49,16 @@ def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     if vertical:
         # Let column(x) to be fixed and change the row(y)
         for dy in range(int(-distance / 2), int(distance / 2)):
-            if __IsValid(x, y + dy, gray_img) and gray_img[y + dy, x] < min_gray:
+            if __IsValid(x, y + dy,
+                         gray_img) and gray_img[y + dy, x] < min_gray:
                 min_gray = gray_img[y + dy, x]
                 grad_x, grad_y = x, y + dy
     else:
         c_x, c_y = x, y
         # up
-        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y, gray_img) and np.sqrt(
+                np.sum(np.square(np.array([c_x, c_y]) -
+                                 np.array([x, y])))) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
                 grad_x, grad_y = c_x, c_y
@@ -107,7 +67,9 @@ def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
 
         c_x, c_y = x, y
         # down
-        while __IsValid(c_x, c_y, gray_img) and np.sqrt(np.sum(np.square(np.array([c_x, c_y]) - np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y, gray_img) and np.sqrt(
+                np.sum(np.square(np.array([c_x, c_y]) -
+                                 np.array([x, y])))) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
                 grad_x, grad_y = c_x, c_y
@@ -121,7 +83,77 @@ def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
         return (grad_x, grad_y)
 
 
-def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0, kalman_filter=None, DRAW_POINTS=True):
+def configure_kalman_filter():
+    """Configure the kalman filter
+
+    Returns:
+        kalman_filter [cv2.KalmanFilter]
+    """
+    # State number: 4, including (x，y，dx，dy) (position and velocity)
+    # Measurement number: 2, (x, y) (position)
+    kalman = cv2.KalmanFilter(4, 2)
+    kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]],
+                                        np.float32)
+    kalman.transitionMatrix = np.array(
+        [[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+    kalman.processNoiseCov = np.array(
+        [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+        np.float32) * 0.03
+
+    return kalman
+
+
+def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
+    """Get the two convex defect points
+
+    Arguments:
+        contour {cv2.contour} -- [the contour of the finger]
+
+    Returns:
+        defect_points [list of tuple] -- [(left_x, left_y), (right_x, right_y)]
+        hull_line [list of tuple] -- [(start1, end1), (start2, end2)]
+    """
+    # In case no contour or the contour area is too small (single fingertip)
+    if contour is None or cv2.contourArea(contour) < MIN_CHECK_AREA:
+        return None, None
+
+    # Get the convex defects
+    hull = cv2.convexHull(contour, returnPoints=False)
+    defects = cv2.convexityDefects(contour, hull)
+
+    # Get the defects with the largest 2 distance
+    if defects is None:
+        return None, None
+
+    # Filter the defects with threshold
+    defects = defects[defects[:, 0, 3] > MIN_DEFECT_DISTANCE]
+    if defects.shape[0] < 2:
+        return None, None
+
+    sorted_defects = sorted(defects[:, 0, :], key=lambda x: x[3])
+
+    defect_points = []
+    hull_lines = []
+    for s, e, f, d in sorted_defects[-2:]:
+        start = tuple(contour[s][0])
+        end = tuple(contour[e][0])
+        far = tuple(contour[f][0])
+        defect_points.append(far)
+        hull_lines.append((start, end))
+
+    if defect_points[0][0] > defect_points[1][0]:
+        defect_points[0], defect_points[1] = defect_points[1], defect_points[0]
+        hull_lines[0], hull_lines[1] = hull_lines[1], hull_lines[0]
+
+    return defect_points, hull_lines
+
+
+def get_touch_point(finger_contour,
+                    finger_img,
+                    MIN_CHECK_AREA=0,
+                    MIN_DEFECT_DISTANCE=0,
+                    kalman_filter=None,
+                    DRAW_POINTS=True):
     """Extract feature points with the max contour
 
     Arguments:
@@ -141,7 +173,8 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DIS
         return None, None
 
     # Get the convex defects point
-    defect_points, _ = get_defect_points(finger_contour, MIN_CHECK_AREA, MIN_DEFECT_DISTANCE)
+    defect_points, _ = get_defect_points(finger_contour, MIN_CHECK_AREA,
+                                         MIN_DEFECT_DISTANCE)
 
     if defect_points is None:
         return None, None
@@ -153,21 +186,29 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DIS
     # Calculate the touch point according to the gradient change
     gray_img = cv2.cvtColor(finger_img, cv2.COLOR_BGR2GRAY)
     search_distance = np.sqrt(
-        np.sum(np.square(np.array(defect_points[0]) - np.array(defect_points[1])))) / 5
+        np.sum(
+            np.square(np.array(defect_points[0]) -
+                      np.array(defect_points[1])))) / 5
 
     if abs(y2 - y1) < 1e-6:
-        touch_point = __get_min_gray(
-            gray_img, middle_point, distance=search_distance, vertical=True)
+        touch_point = __get_min_gray(gray_img,
+                                     middle_point,
+                                     distance=search_distance,
+                                     vertical=True)
     else:
-        grad_direc = - (x2 - x1) / (y2 - y1)
-        touch_point = __get_min_gray(
-            gray_img, middle_point, distance=search_distance, vertical=False, slope=grad_direc)
+        grad_direc = -(x2 - x1) / (y2 - y1)
+        touch_point = __get_min_gray(gray_img,
+                                     middle_point,
+                                     distance=search_distance,
+                                     vertical=False,
+                                     slope=grad_direc)
 
     # If kalman filter adopted, use it to correct the observation
     filter_touch_point = None
     if kalman_filter is not None:
         kalman_filter.correct(
-            np.array([[np.float32(touch_point[0])], [np.float32(touch_point[1])]]))
+            np.array([[np.float32(touch_point[0])],
+                      [np.float32(touch_point[1])]]))
         predict_point = kalman_filter.predict()
         filter_touch_point = (int(predict_point[0]), int(predict_point[1]))
 
@@ -186,75 +227,6 @@ def get_touch_point(finger_contour, finger_img, MIN_CHECK_AREA=0, MIN_DEFECT_DIS
     return final_touch_point, defect_points
 
 
-def configure_kalman_filter():
-    """Configure the kalman filter
-
-    Returns:
-        kalman_filter [cv2.KalmanFilter]
-    """
-    # State number: 4, including (x，y，dx，dy) (position and velocity)
-    # Measurement number: 2, (x, y) (position)
-    kalman = cv2.KalmanFilter(4, 2)
-    kalman.measurementMatrix = np.array(
-        [[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
-    kalman.transitionMatrix = np.array(
-        [[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
-    kalman.processNoiseCov = np.array(
-        [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 0.03
-
-    return kalman
-
-def segment_diff_fingers(contour, defect_points, touch_point=None):
-    """Segment the contour to the up finger and down finger
-    
-    Arguments:
-        contour {[type]} -- [description]
-        defect_points {[type]} -- [description]
-        touch_point {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
-    """
-    if contour is None or defect_points is None:
-        return None, None
-
-    to_add = np.reshape(touch_point, [1, 1, 2])
-    (x1, y1), (x2, y2) = defect_points
-    
-    if abs(x2 - x1) < 1e-6:
-        up_finger = contour[contour[:, 0, 0] <= x1]
-        down_finger = contour[contour[:, 0, 0] >= x1]
-    else:
-        grad_direc = (y2 - y1) / (x2 - x1)
-        offset = y1 - grad_direc * x1
-        up_finger = contour[grad_direc * contour[:, 0, 0] + offset - contour[:, 0, 1] >= 0]
-        down_finger = contour[grad_direc * contour[:, 0, 0] + offset - contour[:, 0, 1] <= 0]
-    
-    if touch_point is not None:
-        index1 = np.where((up_finger[:, 0, 0] == x1) & (up_finger[:, 0, 1] == y1))[0]
-        if index1 is not None and len(index1) != 0:
-            up_finger = np.insert(up_finger, index1[-1] + 1, to_add, axis=0)
-
-        down_finger = np.insert(down_finger, down_finger.shape[0], to_add, axis=0)
-    
-    return up_finger, down_finger
-
-def draw_vertical_lines(img, line_num=0):
-    """Draw white vertical lines in img
-    
-    Arguments:
-        img {[type]} -- [description]
-        line_num {[type]} -- [description]
-    """
-    if img is None:
-        return
-
-    width, height = img.shape[1], img.shape[0]
-
-    for i in range(line_num):
-        cv2.line(img, (width // (line_num + 1) * (i + 1), 0),
-                (width // (line_num + 1) * (i + 1), height), [255, 255, 255], 3)
-
 if __name__ == '__main__':
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
@@ -262,8 +234,9 @@ if __name__ == '__main__':
     try:
         WIDTH, HEIGHT = 640, 480
         # Note: Higher framerate will bring noise to the segmented image
-        camera, rawCapture = picamera_control.configure_camera(
-            WIDTH, HEIGHT, FRAME_RATE=35)
+        camera, rawCapture = picamera_control.configure_camera(WIDTH,
+                                                               HEIGHT,
+                                                               FRAME_RATE=35)
 
         # Kalman filter to remove noise from the point movement
         kalman_filter = configure_kalman_filter()
@@ -278,48 +251,45 @@ if __name__ == '__main__':
         hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
         ver_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
 
-        print('-'*60)
-        print("To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN")
+        print('-' * 60)
+        print(
+            "To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN"
+        )
         print("Press F to turn ON/OFF the kalman filter")
-        print('-'*60)
+        print('-' * 60)
 
-        for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        for frame in camera.capture_continuous(rawCapture,
+                                               format="bgr",
+                                               use_video_port=True):
             bgr_image = frame.array
 
             # Get the mask and its contour using the Otsu thresholding method and apply the mask to image
-            mask, contour = segment_otsu.threshold_masking(bgr_image)
+            mask, contour = threshold_masking(bgr_image)
             finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
-            two_finger_image = finger_image.copy()
 
             # Get touch point and defect points from the contour and draw points in the finger_image image
             touch_point, defect_points = get_touch_point(
-                contour, finger_image, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000, kalman_filter=kalman_filter, DRAW_POINTS=True)
+                contour,
+                finger_image,
+                MIN_CHECK_AREA=100000,
+                MIN_DEFECT_DISTANCE=5000,
+                kalman_filter=kalman_filter,
+                DRAW_POINTS=True)
 
             # Track the touch point
-            dx, dy = tracker.calculate_scale_rela_move(touch_point, MOVE_SCALE_RANGE=100)
+            dx, dy = tracker.calculate_scale_rela_move(touch_point,
+                                                       MOVE_SCALE_RANGE=100)
 
             # Draw the touch point track
             if dx is not None:
-                dx = - dx * DRAW_SCALER
+                dx = -dx * DRAW_SCALER
                 dy = dy * DRAW_SCALER
             hor_board.draw_filled_point((dx, 0))
             ver_board.draw_filled_point((0, dy))
             hv_board.draw_filled_point((dx, dy))
-            
-            # Segment the two fingers
-            up_finger_contour, down_finger_contour = segment_diff_fingers(contour, defect_points, touch_point)
-            
-            if up_finger_contour is not None:
-                cv2.drawContours(two_finger_image, [up_finger_contour], 0, [0, 0, 255], 3)
-                cv2.drawContours(two_finger_image, [down_finger_contour], 0, [255, 0, 0], 3)
-            
-            if touch_point is not None:
-                cv2.circle(two_finger_image, touch_point, 5, [255, 0, 0], -1)
-            
+
             # Display
-            finger_image_joint = np.concatenate((finger_image, two_finger_image), axis=1)
-            draw_vertical_lines(finger_image_joint, 1)
-            cv2.imshow('Finger', finger_image_joint)
+            cv2.imshow('Finger', finger_image)
 
             H_V_joint = np.concatenate(
                 (hv_board.board, hor_board.board, ver_board.board), axis=1)
@@ -351,6 +321,6 @@ if __name__ == '__main__':
         camera.close()
         cv2.destroyAllWindows()
         print("Exception in user code:")
-        print('-'*60)
+        print('-' * 60)
         traceback.print_exc(file=sys.stdout)
-        print('-'*60)
+        print('-' * 60)

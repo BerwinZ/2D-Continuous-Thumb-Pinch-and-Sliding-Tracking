@@ -44,7 +44,9 @@ def live_video(camera, rawCapture):
     capture_index = 0
 
     # Capture an image from camera and write it to the rawCapture
-    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+    for frame in camera.capture_continuous(rawCapture,
+                                           format="bgr",
+                                           use_video_port=True):
         bgr_image = frame.array
         cv2.imshow('Live Video', bgr_image)
 
@@ -53,8 +55,8 @@ def live_video(camera, rawCapture):
         if keypress == 27:
             break
         elif keypress == ord('s'):
-            cv2.imwrite("./capture/hand_" +
-                        str(capture_index) + ".jpg", bgr_image)
+            cv2.imwrite("./capture/hand_" + str(capture_index) + ".jpg",
+                        bgr_image)
             capture_index += 1
 
         rawCapture.truncate(0)
@@ -74,6 +76,6 @@ if __name__ == "__main__":
         camera.close()
         cv2.destroyAllWindows()
         print("Exception in user code:")
-        print('-'*60)
+        print('-' * 60)
         traceback.print_exc(file=sys.stdout)
-        print('-'*60)
+        print('-' * 60)

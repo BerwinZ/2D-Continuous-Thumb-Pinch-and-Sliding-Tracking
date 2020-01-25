@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class point_type(IntEnum):
     MIN_X = 0
     MAX_X = 1
@@ -32,7 +33,7 @@ class point_trakcer:
         print("Current base points", self.base_point)
         self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
 
-    def calculate_scale_rela_move(self, point, MOVE_SCALE_RANGE = 1):
+    def calculate_scale_rela_move(self, point, MOVE_SCALE_RANGE=1):
         """Canculate the relative movements of current touch points to the old touch points
 
         Arguments:
@@ -45,10 +46,14 @@ class point_trakcer:
         if point is None:
             return None, None
 
-        dx = self._scaler(point[0], [self.base_point[int(point_type.MIN_X)], -
-                                     MOVE_SCALE_RANGE], [self.base_point[int(point_type.MAX_X)], MOVE_SCALE_RANGE])
-        dy = self._scaler(point[1], [self.base_point[int(point_type.MIN_Y)], -
-                                     MOVE_SCALE_RANGE], [self.base_point[int(point_type.MAX_Y)], MOVE_SCALE_RANGE])
+        dx = self._scaler(
+            point[0],
+            [self.base_point[int(point_type.MIN_X)], -MOVE_SCALE_RANGE],
+            [self.base_point[int(point_type.MAX_X)], MOVE_SCALE_RANGE])
+        dy = self._scaler(
+            point[1],
+            [self.base_point[int(point_type.MIN_Y)], -MOVE_SCALE_RANGE],
+            [self.base_point[int(point_type.MAX_Y)], MOVE_SCALE_RANGE])
 
         return dx, dy
 
@@ -65,4 +70,5 @@ class point_trakcer:
         """
         min_base, min_target = min_base_target
         max_base, max_target = max_base_target
-        return (value - min_base) / (max_base - min_base) * (max_target - min_target) + min_target
+        return (value - min_base) / (max_base - min_base) * (
+            max_target - min_target) + min_target

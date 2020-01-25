@@ -15,7 +15,6 @@ import os
 import sys, traceback
 
 
-
 def read_images(folder_path: str):
     """Read hand images from folder
     
@@ -69,7 +68,8 @@ def hist_masking(target, hist):
 
     # Filter to smooth the img
     kernel_size = 25
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
+                                       (kernel_size, kernel_size))
     mask = cv2.filter2D(dst, -1, kernel)
 
     # Use threshold to make remove more noise
@@ -85,14 +85,13 @@ def hist_masking(target, hist):
     # for cont in contour_list:
     #     area_cnt = cv2.contourArea(cont)
     #     max_area = max(area_cnt, max_area)
-    
+
     # if max_area < 10000:
     #     return np.zeros(dst.shape, dtype='uint8')
     # else:
     #     return dst
 
     return mask
-
 
 
 if __name__ == '__main__':
@@ -105,7 +104,9 @@ if __name__ == '__main__':
 
         camera, rawCapture = picamera_control.configure_camera(640, 480)
 
-        for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        for frame in camera.capture_continuous(rawCapture,
+                                               format="bgr",
+                                               use_video_port=True):
             bgr_image = frame.array
 
             mask = hist_masking(bgr_image, hand_hist)
@@ -129,6 +130,6 @@ if __name__ == '__main__':
         camera.close()
         cv2.destroyAllWindows()
         print("Exception in user code:")
-        print('-'*60)
+        print('-' * 60)
         traceback.print_exc(file=sys.stdout)
-        print('-'*60)
+        print('-' * 60)

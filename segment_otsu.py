@@ -14,7 +14,6 @@ import picamera_control
 import sys, traceback
 
 
-
 def threshold_masking(img):
     """Get the mask for the img
     1. Use Otsu thresholding
@@ -39,19 +38,19 @@ def threshold_masking(img):
     # mask = cv2.inRange(img_ycrcb[:,:,0], np.array([0]), np.array([150]))
 
     # Otsu Thresholding
-    _, mask = cv2.threshold(
-        img_ycrcb[:, :, 1], 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    _, mask = cv2.threshold(img_ycrcb[:, :, 1], 0, 255,
+                            cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
     # Erode or dilate the edges that has been removed
     kernel_size = min(img.shape[0], img.shape[1]) // 50
-    element = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (kernel_size, kernel_size))
+    element = cv2.getStructuringElement(cv2.MORPH_RECT,
+                                        (kernel_size, kernel_size))
     mask = cv2.erode(mask, element)
     mask = cv2.dilate(mask, element)
 
     # Get the all contours, CHAIN_APPROX_NONE means get all the points
-    _, contours, _ = cv2.findContours(
-        mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    _, contours, _ = cv2.findContours(mask, cv2.RETR_CCOMP,
+                                      cv2.CHAIN_APPROX_SIMPLE)
     max_contour = None
 
     # Get the contour with max area
@@ -79,7 +78,9 @@ if __name__ == '__main__':
     try:
         camera, rawCapture = picamera_control.configure_camera(640, 480)
 
-        for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        for frame in camera.capture_continuous(rawCapture,
+                                               format="bgr",
+                                               use_video_port=True):
             bgr_image = frame.array
 
             # img_ycrcb = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2YCR_CB)
@@ -112,6 +113,6 @@ if __name__ == '__main__':
         camera.close()
         cv2.destroyAllWindows()
         print("Exception in user code:")
-        print('-'*60)
+        print('-' * 60)
         traceback.print_exc(file=sys.stdout)
-        print('-'*60)
+        print('-' * 60)

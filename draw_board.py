@@ -5,6 +5,25 @@ A board that allow user to draw points on the board
 import cv2
 import numpy as np
 
+
+def draw_vertical_lines(img, line_num=0):
+    """Draw white vertical lines in img
+
+    Arguments:
+        img {[type]} -- [description]
+        line_num {[type]} -- [description]
+    """
+    if img is None:
+        return
+
+    width, height = img.shape[1], img.shape[0]
+
+    for i in range(line_num):
+        cv2.line(img, (width // (line_num + 1) * (i + 1), 0),
+                 (width // (line_num + 1) * (i + 1), height), [255, 255, 255],
+                 3)
+
+
 class draw_board:
     def __init__(self, WIDTH=480, HEIGHT=480, RADIUS=10, MAX_POINTS=10):
         """Draw board for showing the points
@@ -22,13 +41,11 @@ class draw_board:
         self.points = []
         self.max_points = MAX_POINTS
 
-
     def reset_board(self):
         """Reset the board to all 0 array
         """
         self.board = self.board * 0
         self.points = []
-
 
     def draw_filled_point(self, point, middle=True, color=[255, 0, 0]):
         """Draw points on the board
@@ -44,14 +61,16 @@ class draw_board:
             self.points.append(None)
         else:
             if middle:
-                new_point = (int(point[0] + self.width / 2), int(point[1] + self.height / 2))
+                new_point = (int(point[0] + self.width / 2),
+                             int(point[1] + self.height / 2))
             else:
                 new_point = tuple(point)
             self.points.append(new_point)
 
         if len(self.points) > self.max_points:
             if self._IsValid(self.points[0]):
-                cv2.circle(self.board, self.points[0], self.radius, [0, 0, 0], -1)
+                cv2.circle(self.board, self.points[0], self.radius, [0, 0, 0],
+                           -1)
             self.points.pop(0)
             for p in self.points:
                 if self._IsValid(p):
@@ -61,7 +80,8 @@ class draw_board:
                 cv2.circle(self.board, new_point, self.radius, color, -1)
 
     def _IsValid(self, point):
-        return point is not None and 0 <= point[0] < self.width and 0 <= point[1] < self.height
+        return point is not None and 0 <= point[0] < self.width and 0 <= point[
+            1] < self.height
 
 
 if __name__ == '__main__':
