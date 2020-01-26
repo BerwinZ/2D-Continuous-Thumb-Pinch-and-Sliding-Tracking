@@ -15,7 +15,7 @@ import traceback
 import picamera_control
 from draw_board import draw_board, draw_vertical_lines
 from segment_otsu import threshold_masking
-from relative_mov_tracker import point_trakcer
+from move_tracker import point_trakcer
 from tracking_convdef import get_defect_points, configure_kalman_filter
 
 
@@ -93,30 +93,35 @@ def get_bound_points(up_contour, down_contour, height, width):
             top_right = None
 
     bottom_left = None
-    left_bd = np.where(up_contour[:, 0, 0] == 0)[0]
+    left_bd = np.where(down_contour[:, 0, 0] == 0)[0]
     if len(left_bd) > 0:
-        y_list = up_contour[left_bd, 0, 1]
+        y_list = down_contour[left_bd, 0, 1]
         bottom_left = (0, min(y_list))
     else:
-        bottom_bd = np.where(up_contour[:, 0, 1] == height - 1)[0]
+        bottom_bd = np.where(down_contour[:, 0, 1] == height - 1)[0]
         if len(bottom_bd) > 0:
-            x_list = up_contour[bottom_bd, 0, 0]
+            x_list = down_contour[bottom_bd, 0, 0]
             bottom_left = (min(x_list), height - 1)
         else:
             bottom_left = None
 
     bottom_right = None
-    right_bd = np.where(up_contour[:, 0, 0] == width - 1)[0]
+    right_bd = np.where(down_contour[:, 0, 0] == width - 1)[0]
     if len(right_bd) > 0:
-        y_list = up_contour[right_bd, 0, 1]
+        y_list = down_contour[right_bd, 0, 1]
         bottom_right = (0, min(y_list))
     else:
-        bottom_bd = np.where(up_contour[:, 0, 1] == height - 1)[0]
+        bottom_bd = np.where(down_contour[:, 0, 1] == height - 1)[0]
         if len(bottom_bd) > 0:
-            x_list = up_contour[bottom_bd, 0, 0]
+            x_list = down_contour[bottom_bd, 0, 0]
             bottom_right = (max(x_list), height - 1)
         else:
-            bottom_right = None
+            left_bd = np.where(down_contour[:, 0, 0] == 0)[0]
+            if len(left_bd) > 0:
+                y_list = down_contour[left_bd, 0, 1]
+                bottom_right = (0, max(y_list))
+            else:
+                bottom_right = None
 
     return top_left, top_right, bottom_left, bottom_right
 
@@ -170,7 +175,7 @@ if __name__ == '__main__':
             if bound_points:
                 for point in list(bound_points):
                     if point:
-                        cv2.circle(finger_image, point, 5, [0, 0, 255], -1)
+                        cv2.circle(finger_image, point, 10, [0, 0, 255], -1)
 
             # Display
             cv2.imshow('Finger', finger_image)

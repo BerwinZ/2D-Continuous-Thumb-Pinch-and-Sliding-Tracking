@@ -16,7 +16,7 @@ import traceback
 import picamera_control
 from draw_board import draw_board, draw_vertical_lines
 from segment_otsu import threshold_masking
-from relative_mov_tracker import point_trakcer
+from move_tracker import point_trakcer
 
 
 def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
@@ -277,8 +277,8 @@ if __name__ == '__main__':
                 DRAW_POINTS=True)
 
             # Track the touch point
-            dx, dy = tracker.calculate_scale_rela_move(touch_point,
-                                                       MOVE_SCALE_RANGE=100)
+            dx, dy = tracker.calc_scaled_rela_move(touch_point,
+                                                   MOVE_SCALE_RANGE=100)
 
             # Draw the touch point track
             if dx is not None:

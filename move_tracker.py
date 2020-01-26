@@ -33,7 +33,7 @@ class point_trakcer:
         print("Current base points", self.base_point)
         self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
 
-    def calculate_scale_rela_move(self, point, MOVE_SCALE_RANGE=1):
+    def calc_scaled_rela_move(self, point, MOVE_SCALE_RANGE=1):
         """Canculate the relative movements of current touch points to the old touch points
 
         Arguments:
