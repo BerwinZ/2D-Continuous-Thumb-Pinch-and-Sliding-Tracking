@@ -13,7 +13,7 @@ from time import sleep
 import sys
 import traceback
 import picamera_control
-from draw_tools import draw_vertical_lines, draw_points
+from draw_tools import draw_vertical_lines, draw_points, draw_board
 from segment_otsu import threshold_masking
 from move_tracker import point_trakcer
 from tracking_convdef import get_defect_points, get_min_gray
@@ -52,13 +52,13 @@ def get_touch_line(finger_img, defect_points, line_points_num=10):
     return list(touch_line)
 
 
-def segment_diff_fingers(contour, defect_points, touch_point=None):
+def segment_diff_fingers(contour, defect_points, touch_points=None):
     """Segment the contour to the up finger and down finger
 
     Arguments:
         contour {[type]} -- [description]
         defect_points {[type]} -- [description]
-        touch_point {[type]} -- [description]
+        touch_points {[type]} -- [description]
 
     Returns:
         [type] -- [description]
@@ -79,8 +79,9 @@ def segment_diff_fingers(contour, defect_points, touch_point=None):
         down_finger = contour[grad_direc * contour[:, 0, 0] + offset -
                               contour[:, 0, 1] <= 0]
 
-    if touch_point is not None:
-        to_add = np.reshape(touch_point, [1, 1, 2])
+    if touch_points is not None:
+        to_add = np.reshape(touch_points,
+                            [len(touch_points), 1, 2])
 
         index1 = np.where((up_finger[:, 0, 0] == x1)
                           & (up_finger[:, 0, 1] == y1))[0]
@@ -89,15 +90,26 @@ def segment_diff_fingers(contour, defect_points, touch_point=None):
 
         down_finger = np.insert(down_finger,
                                 down_finger.shape[0],
-                                to_add,
+                                to_add[::-1],
                                 axis=0)
 
     return up_finger, down_finger
 
 
 def get_bound_points(up_contour, down_contour, height, width):
+    """Get the four boundary points of the hand contour
+    
+    Arguments:
+        up_contour {[type]} -- [description]
+        down_contour {[type]} -- [description]
+        height {[type]} -- [description]
+        width {[type]} -- [description]
+    
+    Returns:
+        Boundary Points [list of tuple] -- [top_left, top_right, bottom_left, bottom_right]
+    """
     if up_contour is None or down_contour is None:
-        return None
+        return None, None, None, None
 
     top_left = None
     left_bd = np.where(up_contour[:, 0, 0] == 0)[0]
@@ -142,7 +154,7 @@ def get_bound_points(up_contour, down_contour, height, width):
     right_bd = np.where(down_contour[:, 0, 0] == width - 1)[0]
     if len(right_bd) > 0:
         y_list = down_contour[right_bd, 0, 1]
-        bottom_right = (0, min(y_list))
+        bottom_right = (width - 1, min(y_list))
     else:
         bottom_bd = np.where(down_contour[:, 0, 1] == height - 1)[0]
         if len(bottom_bd) > 0:
@@ -170,14 +182,33 @@ if __name__ == '__main__':
                                                                HEIGHT,
                                                                FRAME_RATE=35)
 
+        DRAW_CONTOUR = True
+
+        # Point tracker
+        tracker = point_trakcer(HEIGHT, WIDTH)
+
+        # Drawing boards
+        DRAW_SCALER = 0.5
+        DR_WIDTH, DR_HEIGHT = 320, 320
+        hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
+        hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        ver_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+
         print('-' * 60)
-        print("Press F to turn ON/OFF the kalman filter")
+        print(
+            "To calibrate, press 'C' and move the hand in IMAGE LEFT, RIGHT, UP, DOWN"
+        )
+        print("Press 'D' to turn on/off the contour drawing")
         print('-' * 60)
 
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
                                                use_video_port=True):
             bgr_image = frame.array
+
+            # ---------------------------------------------
+            # 1. Calculation
+            # ---------------------------------------------
 
             # Get the mask and its contour using the Otsu thresholding method and apply the mask to image
             mask, contour = threshold_masking(bgr_image)
@@ -197,39 +228,60 @@ if __name__ == '__main__':
 
             # Segment the two fingers
             up_finger_contour, down_finger_contour = segment_diff_fingers(
-                contour, defect_points)
+                contour, defect_points, touch_line)
 
-            # if up_finger_contour:
-            #     cv2.drawContours(finger_image, [up_finger_contour], 0,
-            #                      [0, 0, 255], 3)
-            #     cv2.drawContours(finger_image, [down_finger_contour], 0,
-            #                      [255, 0, 0], 3)
+            if up_finger_contour is not None and DRAW_CONTOUR:
+                cv2.drawContours(finger_image, [up_finger_contour], 0,
+                                 [0, 0, 255], 3)
+                cv2.drawContours(finger_image, [down_finger_contour], 0,
+                                 [255, 0, 0], 3)
 
             # Get four points
             bound_points = get_bound_points(up_finger_contour,
                                             down_finger_contour,
                                             bgr_image.shape[0],
                                             bgr_image.shape[1])
-            if bound_points:
-                draw_points(finger_image,
-                            list(bound_points),
-                            radius=10,
-                            color=[0, 0, 255])
+
+            to_draw = [bound_points[0], bound_points[3]]
+            draw_points(finger_image, to_draw, radius=10, color=[0, 0, 255])
 
             # Display
             cv2.imshow('Finger', finger_image)
+
+            # ---------------------------------------------
+            # 2. Application
+            # ---------------------------------------------
+
+            dx, dy = tracker.calc_scaled_bound_move(
+                bound_points[0], bound_points[3], MOVE_SCALE_RANGE=[-100, 100])
+
+            # Draw the touch point track
+            if dx is not None:
+                dx = -dx * DRAW_SCALER
+                dy = dy * DRAW_SCALER
+            hor_board.draw_filled_point((dx, 0))
+            ver_board.draw_filled_point((0, dy))
+            hv_board.draw_filled_point((dx, dy))
+
+            # Display
+            H_V_joint = np.concatenate(
+                (hv_board.board, hor_board.board, ver_board.board), axis=1)
+            draw_vertical_lines(H_V_joint, 2)
+            cv2.imshow('H V Movement', H_V_joint)
 
             # if the user pressed ESC, then stop looping
             keypress = cv2.waitKey(1) & 0xFF
             if keypress == 27:
                 break
-            elif keypress == ord('f'):
-                if kalman_filter is None:
-                    kalman_filter = configure_kalman_filter()
-                    print("Kalman Filter ON")
-                else:
-                    kalman_filter = None
-                    print("Kalman Filter OFF")
+            elif keypress == ord('c'):
+                tracker.calibrate_boundary_point(bound_points[0],
+                                                 bound_points[3])
+                hv_board.reset_board()
+                hor_board.reset_board()
+                ver_board.reset_board()
+            elif keypress == ord('d'):
+                DRAW_CONTOUR = not DRAW_CONTOUR
+                print("Draw contour: ", DRAW_CONTOUR)
 
             rawCapture.truncate(0)
 

@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
         print('-' * 60)
         print(
-            "To calibrate, press 'C' and follow the order LEFT, RIGHT, UP, DOWN"
+            "To calibrate, press 'C' and move the hand in IMAGE LEFT, RIGHT, UP, DOWN"
         )
         print("Press F to turn ON/OFF the kalman filter")
         print('-' * 60)
@@ -294,7 +294,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_base_point(touch_point)
+                tracker.calibrate_touch_point(touch_point)
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
