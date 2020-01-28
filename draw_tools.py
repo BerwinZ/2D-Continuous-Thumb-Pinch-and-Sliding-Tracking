@@ -24,6 +24,25 @@ def draw_vertical_lines(img, line_num=0):
                  3)
 
 
+def draw_points(img, points, radius=5, color=[0,255,0]):
+    """Draw point(s) in the img
+    
+    Arguments:
+        img {[type]} -- [description]
+        points {[type]} -- [description]
+        radius {[type]} -- [description]
+        color {[type]} -- [description]
+    """
+    if points is None:
+        return
+    elif type(points) == tuple:
+        cv2.circle(img, points, radius, color, -1)
+    elif type(points) == list:
+        for p in points:
+            if p:
+                cv2.circle(img, p, radius, color, -1)
+
+
 class draw_board:
     def __init__(self, WIDTH=480, HEIGHT=480, RADIUS=10, MAX_POINTS=10):
         """Draw board for showing the points

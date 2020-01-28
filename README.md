@@ -18,7 +18,7 @@ This repo is used to track the thumb's touch position relatived to other fintert
 | segment_otsu.py | segment the hand part from the image with otsu thresholding method |
 | tracking_convdef.py | track the touch point with convexcity defects from the contour of segmented finger |
 | relative_mov_tracker.py | calculate the scaled relative movements of the touch point |
-| draw_board.py | draw points in a board to indicate the movements |
+| draw_tools.py | draw points in a board to indicate the movements, and some useful drawing functions |
 | tracking_bond.py | calculate the movement of hand with boundary points |
 | main.py | TBD |
 

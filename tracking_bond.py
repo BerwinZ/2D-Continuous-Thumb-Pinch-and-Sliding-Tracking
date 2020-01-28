@@ -13,10 +13,43 @@ from time import sleep
 import sys
 import traceback
 import picamera_control
-from draw_board import draw_board, draw_vertical_lines
+from draw_tools import draw_vertical_lines, draw_points
 from segment_otsu import threshold_masking
 from move_tracker import point_trakcer
-from tracking_convdef import get_defect_points, configure_kalman_filter
+from tracking_convdef import get_defect_points, get_min_gray
+
+
+def get_touch_line(finger_img, defect_points, line_points_num=10):
+
+    if defect_points is None:
+        return None
+
+    (x1, y1), (x2, y2) = defect_points
+    gray_img = cv2.cvtColor(finger_img, cv2.COLOR_BGR2GRAY)
+    search_distance = np.sqrt(
+        np.sum(
+            np.square(np.array(defect_points[0]) -
+                      np.array(defect_points[1])))) / 5
+
+    # Get the check points
+    check_points = []
+    for i in range(1, line_points_num):
+        check_points.append((((x2 - x1) // line_points_num * i + x1),
+                             ((y2 - y1) // line_points_num * i + y1)))
+
+    # Get the touch line
+    if abs(y2 - y1) < 1e-6:
+        touch_line = map(get_min_gray, [gray_img] * (line_points_num - 1),
+                         check_points,
+                         [search_distance] * (line_points_num - 1))
+    else:
+        grad_direc = -(x2 - x1) / (y2 - y1)
+        touch_line = map(get_min_gray, [gray_img] * (line_points_num - 1),
+                         check_points,
+                         [search_distance] * (line_points_num - 1),
+                         [grad_direc] * (line_points_num - 1))
+
+    return list(touch_line)
 
 
 def segment_diff_fingers(contour, defect_points, touch_point=None):
@@ -137,9 +170,6 @@ if __name__ == '__main__':
                                                                HEIGHT,
                                                                FRAME_RATE=35)
 
-        # Kalman filter to remove noise from the point movement
-        kalman_filter = configure_kalman_filter()
-
         print('-' * 60)
         print("Press F to turn ON/OFF the kalman filter")
         print('-' * 60)
@@ -154,8 +184,16 @@ if __name__ == '__main__':
             finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
             # Get defect points from the contour
-            defect_points, _ = get_defect_points(
-                contour, MIN_CHECK_AREA=100000, MIN_DEFECT_DISTANCE=5000)
+            defect_points, _ = get_defect_points(contour,
+                                                 MIN_CHECK_AREA=100000,
+                                                 MIN_DEFECT_DISTANCE=5000)
+            draw_points(finger_image, defect_points)
+
+            # Get the touch lines
+            touch_line = get_touch_line(finger_image,
+                                        defect_points,
+                                        line_points_num=10)
+            draw_points(finger_image, touch_line)
 
             # Segment the two fingers
             up_finger_contour, down_finger_contour = segment_diff_fingers(
@@ -173,9 +211,10 @@ if __name__ == '__main__':
                                             bgr_image.shape[0],
                                             bgr_image.shape[1])
             if bound_points:
-                for point in list(bound_points):
-                    if point:
-                        cv2.circle(finger_image, point, 10, [0, 0, 255], -1)
+                draw_points(finger_image,
+                            list(bound_points),
+                            radius=10,
+                            color=[0, 0, 255])
 
             # Display
             cv2.imshow('Finger', finger_image)

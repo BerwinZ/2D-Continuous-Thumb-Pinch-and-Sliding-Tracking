@@ -33,7 +33,7 @@ class point_trakcer:
         print("Current base points", self.base_point)
         self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
 
-    def calc_scaled_rela_move(self, point, MOVE_SCALE_RANGE=1):
+    def calc_scaled_touch_move(self, point, MOVE_SCALE_RANGE=[-1, 1]):
         """Canculate the relative movements of current touch points to the old touch points
 
         Arguments:
@@ -46,29 +46,35 @@ class point_trakcer:
         if point is None:
             return None, None
 
-        dx = self._scaler(
+        dx = self.__scaler(
             point[0],
-            [self.base_point[int(point_type.MIN_X)], -MOVE_SCALE_RANGE],
-            [self.base_point[int(point_type.MAX_X)], MOVE_SCALE_RANGE])
-        dy = self._scaler(
+            (self.base_point[int(point_type.MIN_X)], 
+             self.base_point[int(point_type.MAX_X)]),
+            MOVE_SCALE_RANGE) 
+        dy = self.__scaler(
             point[1],
-            [self.base_point[int(point_type.MIN_Y)], -MOVE_SCALE_RANGE],
-            [self.base_point[int(point_type.MAX_Y)], MOVE_SCALE_RANGE])
+            (self.base_point[int(point_type.MIN_Y)], 
+             self.base_point[int(point_type.MAX_Y)]), 
+            MOVE_SCALE_RANGE)
 
         return dx, dy
 
-    def _scaler(self, value, min_base_target, max_base_target):
-        """Project value from [min_base, max_base] to [min_target, max_target]
+    def calc_scaled_bond_move(self, up_bond, down_bond, MOVE_SCALE_RANGE=[-1, 1]):
+        pass
+
+    def __scaler(self, value, old_range, new_range):
+        """Project value from [min_old, max_old] to [min_new, max_new]
 
         Arguments:
             value {float} -- [description]
-            min_base_target {list} -- [min_base, min_target]
-            max_base_target {list} -- [max_base, max_target]
+            min_base_target {list} -- [min_old, min_new]
+            max_base_target {list} -- [max_old, max_new]
 
         Returns:
             value -- [projected value]
         """
-        min_base, min_target = min_base_target
-        max_base, max_target = max_base_target
-        return (value - min_base) / (max_base - min_base) * (
-            max_target - min_target) + min_target
+
+        min_old, max_old = old_range
+        min_new, max_new = new_range
+        return (value - min_old) / (max_old - min_old) * (
+            max_new - min_new) + min_new

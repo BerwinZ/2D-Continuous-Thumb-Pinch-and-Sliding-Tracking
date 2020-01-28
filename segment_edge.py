@@ -10,7 +10,7 @@ import numpy as np
 from time import sleep
 import picamera_control
 import sys, traceback
-from draw_board import draw_vertical_lines
+from draw_tools import draw_vertical_lines
 
 def edge_masking(img):
     pass
