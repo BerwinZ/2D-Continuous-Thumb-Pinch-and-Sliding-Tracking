@@ -19,7 +19,7 @@ from segment_otsu import threshold_masking
 from move_tracker import point_trakcer
 
 
-def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
+def __get_min_gray(gray_img, start_pos, distance=0, slope=None):
     """Get the min gray in the slope direction and within the distance
 
     Arguments:
@@ -37,50 +37,49 @@ def __get_min_gray(gray_img, start_pos, distance=0, vertical=True, slope=0):
     # x is from left to right, related to width
     # y is from up to down, related to height
     x, y = start_pos
-    min_gray = 255
-    grad_x, grad_y = 0, 0
+    min_gray = float('inf')
+    min_x, min_y = 0, 0
+    height, width = gray_img.shape[0], gray_img.shape[1]
 
-    def __IsValid(x, y, img):
+    def __IsValid(x, y):
         """Check whether x and y is in the boundary of img
         """
-        height, width = img.shape[0], img.shape[1]
         return 0 <= x < width and 0 <= y < height
 
-    if vertical:
+    if slope is None:
         # Let column(x) to be fixed and change the row(y)
         for dy in range(int(-distance / 2), int(distance / 2)):
-            if __IsValid(x, y + dy,
-                         gray_img) and gray_img[y + dy, x] < min_gray:
+            if __IsValid(x, y + dy) and gray_img[y + dy, x] < min_gray:
                 min_gray = gray_img[y + dy, x]
-                grad_x, grad_y = x, y + dy
+                min_x, min_y = x, y + dy
     else:
         c_x, c_y = x, y
         # up
-        while __IsValid(c_x, c_y, gray_img) and np.sqrt(
+        while __IsValid(c_x, c_y) and np.sqrt(
                 np.sum(np.square(np.array([c_x, c_y]) -
                                  np.array([x, y])))) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
-                grad_x, grad_y = c_x, c_y
+                min_x, min_y = c_x, c_y
             c_x = c_x + 1
             c_y = int(c_y + 1 * slope)
 
         c_x, c_y = x, y
         # down
-        while __IsValid(c_x, c_y, gray_img) and np.sqrt(
+        while __IsValid(c_x, c_y) and np.sqrt(
                 np.sum(np.square(np.array([c_x, c_y]) -
                                  np.array([x, y])))) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
-                grad_x, grad_y = c_x, c_y
+                min_x, min_y = c_x, c_y
             c_x = c_x - 1
             c_y = int(c_y - 1 * slope)
 
     # Check the ans
-    if min_gray == -1:
+    if min_gray == float('inf'):
         return start_pos
     else:
-        return (grad_x, grad_y)
+        return (min_x, min_y)
 
 
 def configure_kalman_filter():
@@ -193,14 +192,12 @@ def get_touch_point(finger_contour,
     if abs(y2 - y1) < 1e-6:
         touch_point = __get_min_gray(gray_img,
                                      middle_point,
-                                     distance=search_distance,
-                                     vertical=True)
+                                     distance=search_distance)
     else:
         grad_direc = -(x2 - x1) / (y2 - y1)
         touch_point = __get_min_gray(gray_img,
                                      middle_point,
                                      distance=search_distance,
-                                     vertical=False,
                                      slope=grad_direc)
 
     # If kalman filter adopted, use it to correct the observation

@@ -12,6 +12,7 @@ import numpy as np
 from time import sleep
 import picamera_control
 import sys, traceback
+from draw_board import draw_vertical_lines
 
 
 def threshold_masking(img):
@@ -76,7 +77,9 @@ if __name__ == '__main__':
     This function get the frame from the camera, and use thresholding to segment the hand part
     """
     try:
-        camera, rawCapture = picamera_control.configure_camera(640, 480)
+        camera, rawCapture = picamera_control.configure_camera(640,
+                                                               480,
+                                                               FRAME_RATE=35)
 
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
@@ -93,12 +96,15 @@ if __name__ == '__main__':
 
             # Apply the mask to the image
             segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
-            cv2.drawContours(segment, [max_contour], 0, [0, 0, 255])
+            cv2.drawContours(segment, [max_contour],
+                             0, [0, 0, 255],
+                             thickness=3)
 
             # Display
-            cv2.imshow("original", bgr_image)
+            image_joint = np.concatenate((bgr_image, segment), axis=1)
+            draw_vertical_lines(image_joint, 1)
+            cv2.imshow('Image', image_joint)
             cv2.imshow('Mask', mask)
-            cv2.imshow('Segment', segment)
 
             # if the user pressed ESC, then stop looping
             keypress = cv2.waitKey(25) & 0xFF
