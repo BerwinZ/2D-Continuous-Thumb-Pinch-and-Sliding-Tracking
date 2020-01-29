@@ -43,6 +43,28 @@ def draw_points(img, points, radius=5, color=[0,255,0]):
                 cv2.circle(img, p, radius, color, -1)
 
 
+def draw_contours(img, contours, thickness=3, color=[0,255,0]):
+    """Draw contour(s) in the img
+    
+    Arguments:
+        img {[type]} -- [description]
+        contours {[type]} -- [description]
+    
+    Keyword Arguments:
+        thickness {int} -- [description] (default: {3})
+        color {list} -- [description] (default: {[0,255,0]})
+    """
+    if contours is None:
+        return
+    
+    if type(contours) == list:
+        for c in contours:
+            if c is not None:
+                cv2.drawContours(img, [c], 0, color=color, thickness=thickness)
+    else:
+        cv2.drawContours(img, [contours], 0, color=color, thickness=thickness)
+
+
 class draw_board:
     def __init__(self, WIDTH=480, HEIGHT=480, RADIUS=10, MAX_POINTS=10):
         """Draw board for showing the points

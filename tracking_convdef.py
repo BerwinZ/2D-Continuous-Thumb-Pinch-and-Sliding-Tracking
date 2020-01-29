@@ -5,7 +5,8 @@ It includes:
 1. Call Otsu threshold to finger_image the hand part and get the contour of hand
 2. Get 2 Convexity Defects with largest distance from the contour
 3. Calculate the middle point of convexity defects, find the touch point and use Kalman filter to correct it
-4. Draw the relative movements in a drawing board
+4. Use point_tracker to track the touch points movements
+5. Draw the relative movements in a drawing board
 '''
 
 import cv2
@@ -163,7 +164,7 @@ def get_touch_point(defect_points,
         touchPoint [tuple] -- [The touch coordinate of the fingertips]
         filter_touchPoint [tuple] -- [The touch coordinate of the fingertips after kalman filter]
     """
-    if defect_points is None or finger_image is None:
+    if defect_points is None or finger_img is None:
         return None, None
 
     # Calculate the middle point

@@ -5,6 +5,9 @@ It includes:
 1. Call Otsu threshold to finger_image the hand part and get the contour of hand
 2. Get 2 Convexity Defects with largest distance from the contour
 3. Segment the contour to up and bottom finger contour
+4. Get the top_left and bottom_right boundary points
+5. Use bound_tracker to track the movements
+6. Draw the relative movements in a drawing board
 '''
 
 import cv2
@@ -80,8 +83,11 @@ def segment_diff_fingers(contour, defect_points, touch_points=None):
                               contour[:, 0, 1] <= 0]
 
     if touch_points is not None:
-        to_add = np.reshape(touch_points,
-                            [len(touch_points), 1, 2])
+        if type(touch_points) == list:
+            to_add = np.reshape(touch_points,
+                                [len(touch_points), 1, 2])
+        elif type(touch_points) == tuple:
+            to_add = np.reshape(touch_points, [1, 1, 2])
 
         index1 = np.where((up_finger[:, 0, 0] == x1)
                           & (up_finger[:, 0, 1] == y1))[0]
