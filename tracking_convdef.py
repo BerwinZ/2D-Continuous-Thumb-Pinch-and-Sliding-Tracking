@@ -16,7 +16,7 @@ import traceback
 import picamera_control
 from draw_tools import draw_board, draw_vertical_lines, draw_points
 from segment_otsu import threshold_masking
-from move_tracker import point_trakcer
+from move_tracker import touch_trakcer
 
 
 def configure_kalman_filter():
@@ -215,7 +215,7 @@ if __name__ == '__main__':
         kalman_filter = configure_kalman_filter()
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
-        tracker = point_trakcer()
+        tracker = touch_trakcer()
 
         # Drawing boards
         DRAW_SCALER = 0.5
@@ -272,8 +272,8 @@ if __name__ == '__main__':
             # Track the touch point
             if filter_touch_point:
                 touch_point = filter_touch_point
-            dx, dy = tracker.calc_scaled_touch_move(touch_point,
-                                                   MOVE_SCALE_RANGE=[-100, 100])
+            dx, dy = tracker.calc_scaled_move(touch_point,
+                                              MOVE_SCALE_RANGE=[-100, 100])
 
             # Draw the touch point track
             if dx is not None:

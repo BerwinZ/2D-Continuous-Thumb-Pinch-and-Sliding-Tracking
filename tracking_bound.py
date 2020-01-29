@@ -15,7 +15,7 @@ import traceback
 import picamera_control
 from draw_tools import draw_vertical_lines, draw_points, draw_board
 from segment_otsu import threshold_masking
-from move_tracker import point_trakcer
+from move_tracker import bound_trakcer
 from tracking_convdef import get_defect_points, get_min_gray
 
 
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         DRAW_CONTOUR = True
 
         # Point tracker
-        tracker = point_trakcer(HEIGHT, WIDTH)
+        tracker = bound_trakcer(HEIGHT, WIDTH)
 
         # Drawing boards
         DRAW_SCALER = 0.5
@@ -252,7 +252,7 @@ if __name__ == '__main__':
             # 2. Application
             # ---------------------------------------------
 
-            dx, dy = tracker.calc_scaled_bound_move(
+            dx, dy = tracker.calc_scaled_move(
                 bound_points[0], bound_points[3], MOVE_SCALE_RANGE=[-100, 100])
 
             # Draw the touch point track
