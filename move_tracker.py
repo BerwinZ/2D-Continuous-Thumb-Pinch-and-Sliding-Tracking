@@ -1,4 +1,5 @@
 from enum import IntEnum
+import numpy as np
 
 
 class point_type(IntEnum):
@@ -26,9 +27,17 @@ def scaler(value, old_range, new_range):
 
 
 # ------------------------------------------------
+# Parameters for pi camera
+# ------------------------------------------------
+CAMERA_PIXEL = 1000  # 1000 pixels within 1 inch
+THUMB_LENGTH = 2.54 # cm
+
+# ------------------------------------------------
 # Parameters for touch point tracker
 # ------------------------------------------------
-CALIBRATE_BASE_TOUCH = [181, 353, 87, 300]
+# CALIBRATE_BASE_TOUCH = [181, 353, 87, 300]
+CALIBRATE_BASE_TOUCH = [144, 340, 250, 349]
+CALIBRATE_BASE_CORRECT = [151, 101, 73, 139]
 
 
 class touch_trakcer:
@@ -37,8 +46,9 @@ class touch_trakcer:
         """
         self.cur_point_type = point_type.MIN_X
         self.touch_base_point = CALIBRATE_BASE_TOUCH
+        self.touch_base_correct = CALIBRATE_BASE_CORRECT
 
-    def calibrate_touch_point(self, point):
+    def calibrate_touch_point(self, point, angle=None, centroid_pos=None):
         """Reset the old touch point
 
         Arguments:
@@ -48,12 +58,29 @@ class touch_trakcer:
             return
 
         if self.cur_point_type == point_type.MIN_X or self.cur_point_type == point_type.MAX_X:
+            # Store the touch position
             self.touch_base_point[int(self.cur_point_type)] = point[0]
+            
+            # Store the touch angle
+            if angle is not None:
+                self.touch_base_correct[int(self.cur_point_type)] = angle
         else:
+            # Store the touch position
             self.touch_base_point[int(self.cur_point_type)] = point[1]
+
+            # Store the centroid position
+            if centroid_pos is not None:
+                self.touch_base_correct[int(self.cur_point_type)] = centroid_pos[1]
+        
+        # Print updated calibration data
         print("Store base touch point", self.cur_point_type)
         print("Current base touch points", self.touch_base_point)
+        if angle is not None and centroid_pos is not None:
+            print("Current base angle", self.touch_base_correct)
+
+        # Update current storing state
         self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
+
 
     def calc_scaled_move(self, point, MOVE_SCALE_RANGE=[-1, 1]):
         """Canculate the scaled movements of current touch points to the base points
@@ -77,12 +104,27 @@ class touch_trakcer:
 
         return dx, dy
 
+    def calc_correct_scaled_move(self, touch_angle, centroid_pos, MOVE_SCALE_RANGE=[-1, 1]):
+        if touch_angle is None or centroid_pos is None:
+            return None, None
+        
+        dx = scaler(touch_angle, self.touch_base_correct[:2], MOVE_SCALE_RANGE)
+        dy = scaler(self.__coor_to_real_pos(centroid_pos[1]), 
+            (self.__coor_to_real_pos(self.touch_base_correct[int(point_type.MIN_Y)]), 
+            self.__coor_to_real_pos(self.touch_base_correct[int(point_type.MAX_Y)])),
+            MOVE_SCALE_RANGE)
+
+        return dx, dy
+
+    def __coor_to_real_pos(self, coor):
+        print(2 * coor * 2.54 / CAMERA_PIXEL / THUMB_LENGTH)
+        return np.sin(np.arccos(2 * coor * 2.54 / CAMERA_PIXEL / THUMB_LENGTH)) * THUMB_LENGTH
+
 
 # ------------------------------------------------
 # Parameters for boundary point tracker
 # ------------------------------------------------
 CALIBRATE_BASE_BOUNDARY = [-101, 544, 56, -135]
-
 
 class bound_trakcer:
     def __init__(self, IMG_HEIGHT=None, IMG_WIDTH=None):

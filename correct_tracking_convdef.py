@@ -17,10 +17,52 @@ import sys
 import traceback
 import picamera_control
 from segment_otsu import threshold_masking
-from tracking_convdef import get_defect_points, get_touch_point, configure_kalman_filter
+from tracking_convdef import get_defect_points, get_touch_point, configure_kalman_filter, points_distance
 from tracking_bound import segment_diff_fingers
 from move_tracker import touch_trakcer
 from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
+
+
+def get_centroid(contour):
+    if contour is None:
+        return None
+
+    moment = cv2.moments(contour)
+    if moment['m00'] != 0:
+        cx = int(moment['m10'] / moment['m00'])
+        cy = int(moment['m01'] / moment['m00'])
+        return cx, cy
+    else:
+        return None
+
+def calc_touch_angle(base, target):
+    """Calculate the degree angle from base to target
+    
+    Arguments:
+        base {[type]} -- [description]
+        target {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if base is None or target is None:
+        return None
+
+    x1, y1 = base
+    x2, y2 = target
+    if abs(x1 - x2) < 1e-9:
+        if y2 > y1:
+            return 90
+        else:
+            return -90
+    else:
+        slope = (y1 - y2) / (x1 - x2)
+        angle = np.degrees(np.arctan(slope))
+        if y2 > y1 and angle < 0:
+            angle = 180 + angle
+
+        return angle
+
 
 if __name__ == '__main__':
     """
@@ -40,7 +82,7 @@ if __name__ == '__main__':
         tracker = touch_trakcer()
 
         # Drawing boards
-        DRAW_SCALER = 0.5
+        DRAW_SCALER = 50
         DR_WIDTH, DR_HEIGHT = 320, 320
         hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
         hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
@@ -77,14 +119,23 @@ if __name__ == '__main__':
                                                  MIN_DEFECT_DISTANCE=5000)
             touch_point, filter_touch_point = get_touch_point(
                 defect_points, finger_image, kalman_filter=kalman_filter)
+            
             # ---------------------------------------------
             # 1.3 Get up and down finger contour
             # ---------------------------------------------
             up_contour, down_contour = segment_diff_fingers(
-                contour, defect_points, touch_point)
+                contour, defect_points)
 
             # ---------------------------------------------
-            # 1.4 Draw elements
+            # 1.4 Get angle of touch point to the centroid of up contour
+            # ---------------------------------------------
+            up_controid = get_centroid(up_contour)
+            down_controid = get_centroid(down_contour)
+            touch_angle = calc_touch_angle(up_controid, touch_point)
+            touch_angle2 = calc_touch_angle(up_controid, down_controid)
+
+            # ---------------------------------------------
+            # 1.5 Draw elements
             # ---------------------------------------------
             # Two defect points (Green)
             draw_points(finger_image, defect_points, color=[0, 255, 0])
@@ -101,8 +152,12 @@ if __name__ == '__main__':
                           down_contour,
                           thickness=3,
                           color=[255, 0, 0])
+            # Draw centroid points
+            draw_points(finger_image, up_controid, color=[255, 0, 255])
+            draw_points(finger_image, down_controid, color=[255, 0, 255])
+
             # ---------------------------------------------
-            # 1.5 Show image
+            # 1.6 Show image
             # ---------------------------------------------
             image_joint = np.concatenate((finger_image, finger_image2), axis=1)
             draw_vertical_lines(image_joint, 1)
@@ -118,8 +173,16 @@ if __name__ == '__main__':
             if filter_touch_point:
                 touch_point = filter_touch_point
 
-            dx, dy = tracker.calc_scaled_move(touch_point,
-                                              MOVE_SCALE_RANGE=[-100, 100])
+            dx, dy = tracker.calc_correct_scaled_move(touch_angle, up_controid)
+
+            # ---------------------------------------------
+            # 1.6 Show parameters
+            # ---------------------------------------------
+            # if dx is not None and up_contour is not None and defect_points is not None: 
+            #     print(round(dx, 2), round(dy, 2), 
+            #          cv2.contourArea(up_contour), 
+            #          cv2.contourArea(down_contour),
+            #          round(points_distance(defect_points[0], defect_points[1]), 1))
 
             # ---------------------------------------------
             # 2.2 Draw the movments in the drawing board
@@ -147,7 +210,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(touch_point)
+                tracker.calibrate_touch_point(touch_point, touch_angle, up_controid)
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()

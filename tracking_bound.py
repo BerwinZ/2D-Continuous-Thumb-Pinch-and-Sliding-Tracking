@@ -194,7 +194,6 @@ if __name__ == '__main__':
         tracker = bound_trakcer(HEIGHT, WIDTH)
 
         # Drawing boards
-        DRAW_SCALER = 0.5
         DR_WIDTH, DR_HEIGHT = 320, 320
         hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
         hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
@@ -258,10 +257,10 @@ if __name__ == '__main__':
             # 2. Application
             # ---------------------------------------------
 
-            dx, dy = tracker.calc_scaled_move(
-                bound_points[0], bound_points[3], MOVE_SCALE_RANGE=[-100, 100])
+            dx, dy = tracker.calc_scaled_move(bound_points[0], bound_points[3])
 
             # Draw the touch point track
+            DRAW_SCALER = 50
             if dx is not None:
                 dx = -dx * DRAW_SCALER
                 dy = dy * DRAW_SCALER

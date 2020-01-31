@@ -40,6 +40,25 @@ def configure_kalman_filter():
     return kalman
 
 
+def points_distance(point1, point2):
+    """Return the distance between point 1 and point2
+    
+    Arguments:
+        point1 {[type]} -- [description]
+        point2 {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if point1 is None or point2 is None:
+        return None
+    d = np.sqrt(
+            np.sum(
+                np.square(np.array(point1) -
+                          np.array(point2))))
+    return d
+
+
 def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):
     """Get the two convex defect points
 
@@ -121,9 +140,7 @@ def get_min_gray(gray_img, start_pos, distance=0, slope=None):
     else:
         c_x, c_y = x, y
         # up
-        while __IsValid(c_x, c_y) and np.sqrt(
-                np.sum(np.square(np.array([c_x, c_y]) -
-                                 np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y) and points_distance((c_x, c_y), (x, y)) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
                 min_x, min_y = c_x, c_y
@@ -132,9 +149,7 @@ def get_min_gray(gray_img, start_pos, distance=0, slope=None):
 
         c_x, c_y = x, y
         # down
-        while __IsValid(c_x, c_y) and np.sqrt(
-                np.sum(np.square(np.array([c_x, c_y]) -
-                                 np.array([x, y])))) < distance / 2:
+        while __IsValid(c_x, c_y) and points_distance((c_x, c_y), (x, y)) < distance / 2:
             if gray_img[c_y, c_x] < min_gray:
                 min_gray = gray_img[c_y, c_x]
                 min_x, min_y = c_x, c_y
@@ -173,12 +188,9 @@ def get_touch_point(defect_points,
 
     # Calculate the touch point according to the gradient change
     gray_img = cv2.cvtColor(finger_img, cv2.COLOR_BGR2GRAY)
-    search_distance = np.sqrt(
-        np.sum(
-            np.square(np.array(defect_points[0]) -
-                      np.array(defect_points[1])))) / 5
-
-    if abs(y2 - y1) < 1e-6:
+    search_distance = points_distance(defect_points[0], defect_points[1]) / 5
+    
+    if abs(y2 - y1) < 1e-9:
         touch_point = get_min_gray(gray_img,
                                    middle_point,
                                    distance=search_distance)
@@ -219,7 +231,6 @@ if __name__ == '__main__':
         tracker = touch_trakcer()
 
         # Drawing boards
-        DRAW_SCALER = 0.5
         DR_WIDTH, DR_HEIGHT = 320, 320
         hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
         hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
@@ -273,10 +284,10 @@ if __name__ == '__main__':
             # Track the touch point
             if filter_touch_point:
                 touch_point = filter_touch_point
-            dx, dy = tracker.calc_scaled_move(touch_point,
-                                              MOVE_SCALE_RANGE=[-100, 100])
+            dx, dy = tracker.calc_scaled_move(touch_point)
 
             # Draw the touch point track
+            DRAW_SCALER = 50
             if dx is not None:
                 dx = -dx * DRAW_SCALER
                 dy = dy * DRAW_SCALER
