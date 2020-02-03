@@ -30,24 +30,10 @@ def scaler(value, old_range, new_range):
 
 
 # ------------------------------------------------
-# Parameters for pi camera and user
-# ------------------------------------------------
-# Dot per inch (2.54 cm)
-CAMERA_DPI = 96
-# Pixel to length
-pixel_length = 2.54 / CAMERA_DPI
-# Length (cm) of the first knuckle of the thumb
-THUMB_LENGTH = 2.54
-# Imaging coefficient (Roughly)
-CAMERA_COEFF = 480 / CAMERA_DPI / (THUMB_LENGTH / 2)
-
-# ------------------------------------------------
 # Parameters for touch point tracker
 # ------------------------------------------------
 # [Left(X_value), Right(X_value), Up(Y_value), Down(Y_value)]
 CALIBRATE_BASE_TOUCH = [144, 340, 250, 349]
-# [Left(Angle), Right(Angle), Up(Y_value), Down(Y_value)]
-CALIBRATE_BASE_CORRECT = [151, 101, 73, 139]
 
 
 class touch_trakcer:
@@ -56,9 +42,8 @@ class touch_trakcer:
         """
         self.cur_point_type = point_type.MIN_X
         self.touch_base_point = CALIBRATE_BASE_TOUCH
-        self.touch_base_correct = CALIBRATE_BASE_CORRECT
 
-    def calibrate_touch_point(self, point, angle=None, centroid_pos=None):
+    def calibrate_touch_point(self, point):
         """Reset the old touch point
 
         Arguments:
@@ -70,24 +55,13 @@ class touch_trakcer:
         if self.cur_point_type == point_type.MIN_X or self.cur_point_type == point_type.MAX_X:
             # Store the touch position
             self.touch_base_point[int(self.cur_point_type)] = point[0]
-
-            # Store the touch angle
-            if angle is not None:
-                self.touch_base_correct[int(self.cur_point_type)] = angle
         else:
             # Store the touch position
             self.touch_base_point[int(self.cur_point_type)] = point[1]
 
-            # Store the centroid position
-            if centroid_pos is not None:
-                self.touch_base_correct[int(
-                    self.cur_point_type)] = centroid_pos[1]
-
         # Print updated calibration data
         print("Store base touch point", self.cur_point_type)
         print("Current base touch points", self.touch_base_point)
-        if angle is not None and centroid_pos is not None:
-            print("Current base angle", self.touch_base_correct)
 
         # Update current storing state
         self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
@@ -114,10 +88,56 @@ class touch_trakcer:
 
         return dx, dy
 
-    def calc_correct_scaled_move(self,
-                                 touch_angle,
-                                 centroid_pos,
-                                 MOVE_SCALE_RANGE=[-1, 1]):
+
+# ------------------------------------------------
+# Parameters for pi camera and user
+# ------------------------------------------------
+# Dot per inch (2.54 cm)
+CAMERA_DPI = 96
+# Pixel to length
+pixel_length = 2.54 / CAMERA_DPI
+# Length (cm) of the first knuckle of the thumb
+THUMB_LENGTH = 2.54
+# Imaging coefficient (Roughly)
+CAMERA_COEFF = 480 / CAMERA_DPI / (THUMB_LENGTH / 2)
+# ------------------------------------------------
+# Parameters for correct tracker
+# ------------------------------------------------
+# [Left(Angle), Right(Angle), Up(Y_value), Down(Y_value)]
+CALIBRATE_BASE_CORRECT = [151, 101, 73, 139]
+
+
+class correct_tracker:
+    def __init__(self):
+        """Used for tracking the touch point. Transfer the movement of touch point in image coordinate to the movement's of finger in real world.
+        """
+        self.touch_base_correct = CALIBRATE_BASE_CORRECT
+
+    def calibrate_touch_point(self, angle, centroid_pos):
+        """Reset the old touch point
+
+        Arguments:
+            point {[type]} -- [description]
+        """
+        if angle is None or centroid_pos is None:
+            return
+
+        if self.cur_point_type == point_type.MIN_X or self.cur_point_type == point_type.MAX_X:
+            self.touch_base_correct[int(self.cur_point_type)] = angle
+        else:
+            self.touch_base_correct[int(self.cur_point_type)] = centroid_pos[1]
+
+        # Print updated calibration data
+        print("Store base touch point", self.cur_point_type)
+        print("Current base angle", self.touch_base_correct)
+
+        # Update current storing state
+        self.cur_point_type = point_type((int(self.cur_point_type) + 1) % 4)
+
+    def calc_scaled_move(self,
+                         touch_angle,
+                         centroid_pos,
+                         MOVE_SCALE_RANGE=[-1, 1]):
         """Calculate the horizontal and vertical movements with correction
         
         Arguments:

@@ -19,7 +19,7 @@ import picamera_control
 from segment_otsu import threshold_masking
 from tracking_convdef import get_defect_points, get_touch_point, configure_kalman_filter, points_distance
 from tracking_bound import segment_diff_fingers
-from move_tracker import touch_trakcer
+from move_tracker import correct_tracker
 from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
 
 
@@ -78,8 +78,11 @@ if __name__ == '__main__':
         # Kalman filter to remove noise from the point movement
         kalman_filter = None
 
+        # Show image
+        SHOW_IMAGE = True
+
         # Tracker to convert point movement in image coordinate to the draw board coordinate
-        tracker = touch_trakcer()
+        tracker = correct_tracker()
 
         # Drawing boards
         DRAW_SCALER = 50
@@ -159,9 +162,10 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 1.6 Show image
             # ---------------------------------------------
-            image_joint = np.concatenate((finger_image, finger_image2), axis=1)
-            draw_vertical_lines(image_joint, 1)
-            cv2.imshow('Finger', image_joint)
+            if SHOW_IMAGE:
+                image_joint = np.concatenate((finger_image, finger_image2), axis=1)
+                draw_vertical_lines(image_joint, 1)
+                cv2.imshow('Finger', image_joint)
 
             # ---------------------------------------------
             # 2. Application
@@ -173,7 +177,7 @@ if __name__ == '__main__':
             if filter_touch_point:
                 touch_point = filter_touch_point
 
-            dx, dy = tracker.calc_correct_scaled_move(touch_angle, up_controid)
+            dx, dy = tracker.calc_scaled_move(touch_angle, up_controid)
 
             # ---------------------------------------------
             # 1.6 Show parameters
@@ -210,7 +214,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(touch_point, touch_angle, up_controid)
+                tracker.calibrate_touch_point(touch_angle, up_controid)
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
@@ -223,6 +227,10 @@ if __name__ == '__main__':
                     print("Kalman Filter OFF")
             elif keypress == ord('s'):
                 cv2.imwrite('screenshot.jpg', finger_image)
+            elif keypress == ord('a'):
+                if SHOW_IMAGE:
+                    cv2.destroyWindow("Finger")
+                SHOW_IMAGE = not SHOW_IMAGE
 
             rawCapture.truncate(0)
 
