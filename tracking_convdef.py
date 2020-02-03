@@ -16,6 +16,7 @@ import sys
 import traceback
 import picamera_control
 from draw_tools import draw_board, draw_vertical_lines, draw_points
+from math_tools import points_distance
 from segment_otsu import threshold_masking
 from move_tracker import touch_trakcer
 
@@ -38,25 +39,6 @@ def configure_kalman_filter():
         np.float32) * 0.03
 
     return kalman
-
-
-def points_distance(point1, point2):
-    """Return the distance between point 1 and point2
-    
-    Arguments:
-        point1 {[type]} -- [description]
-        point2 {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
-    """
-    if point1 is None or point2 is None:
-        return None
-    d = np.sqrt(
-            np.sum(
-                np.square(np.array(point1) -
-                          np.array(point2))))
-    return d
 
 
 def get_defect_points(contour, MIN_CHECK_AREA=0, MIN_DEFECT_DISTANCE=0):

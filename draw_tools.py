@@ -36,7 +36,8 @@ def draw_points(img, points, radius=5, color=[0,255,0]):
     if points is None:
         return
     elif type(points) == tuple:
-        cv2.circle(img, points, radius, color, -1)
+        if points[0] is not None and points[1] is not None:
+            cv2.circle(img, points, radius, color, -1)
     elif type(points) == list:
         for p in points:
             if p:

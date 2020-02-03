@@ -25,7 +25,7 @@ from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contou
 
 def get_centroid(contour):
     if contour is None:
-        return None
+        return None, None
 
     moment = cv2.moments(contour)
     if moment['m00'] != 0:
@@ -33,7 +33,7 @@ def get_centroid(contour):
         cy = int(moment['m01'] / moment['m00'])
         return cx, cy
     else:
-        return None
+        return None, None
 
 def calc_touch_angle(base, target):
     """Calculate the degree angle from base to target
@@ -50,6 +50,9 @@ def calc_touch_angle(base, target):
 
     x1, y1 = base
     x2, y2 = target
+    if x1 is None or y1 is None or x2 is None or y2 is None:
+        return None
+
     if abs(x1 - x2) < 1e-9:
         if y2 > y1:
             return 90
@@ -174,11 +177,16 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2.1 Use tracker to calculate the movements
             # ---------------------------------------------
-            if filter_touch_point:
-                touch_point = filter_touch_point
+            dx, dy = tracker.calc_scaled_move(touch_angle, up_controid[1])
 
-            dx, dy = tracker.calc_scaled_move(touch_angle, up_controid)
 
+            x1 = points_distance(touch_point, up_controid)
+            x2 = points_distance(touch_point, down_controid)
+            if x1 is not None and x2 is not None:
+                x1 = round(x1, 0)
+                x2 = round(x2, 0)
+                x3 = round(x1 + x2, 0)
+                print(x1, x2, x3)
             # ---------------------------------------------
             # 1.6 Show parameters
             # ---------------------------------------------
@@ -214,7 +222,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(touch_angle, up_controid)
+                tracker.calibrate_touch_point(touch_angle, up_controid[1])
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()

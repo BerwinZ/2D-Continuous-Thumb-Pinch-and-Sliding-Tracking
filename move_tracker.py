@@ -1,33 +1,12 @@
 from enum import IntEnum
 import numpy as np
-
+from math_tools import scaler
 
 class point_type(IntEnum):
     MIN_X = 0
     MAX_X = 1
     MIN_Y = 2
     MAX_Y = 3
-
-
-def scaler(value, old_range, new_range):
-    """Project value from [min_old, max_old] to [min_new, max_new]
-
-    Arguments:
-        value {float} -- [description]
-        min_base_target {list} -- [min_old, min_new]
-        max_base_target {list} -- [max_old, max_new]
-
-    Returns:
-        value -- [projected value]
-    """
-    if value is None or all(old_range) is False or all(new_range) is False:
-        return None
-
-    min_old, max_old = old_range
-    min_new, max_new = new_range
-    return (value - min_old) / (max_old - min_old) * (max_new -
-                                                      min_new) + min_new
-
 
 # ------------------------------------------------
 # Parameters for touch point tracker
@@ -113,19 +92,19 @@ class correct_tracker:
         """
         self.touch_base_correct = CALIBRATE_BASE_CORRECT
 
-    def calibrate_touch_point(self, angle, centroid_pos):
+    def calibrate_touch_point(self, angle, up_cent_y):
         """Reset the old touch point
 
         Arguments:
             point {[type]} -- [description]
         """
-        if angle is None or centroid_pos is None:
+        if angle is None or up_cent_y is None:
             return
 
         if self.cur_point_type == point_type.MIN_X or self.cur_point_type == point_type.MAX_X:
             self.touch_base_correct[int(self.cur_point_type)] = angle
         else:
-            self.touch_base_correct[int(self.cur_point_type)] = centroid_pos[1]
+            self.touch_base_correct[int(self.cur_point_type)] = up_cent_y
 
         # Print updated calibration data
         print("Store base touch point", self.cur_point_type)
@@ -136,13 +115,13 @@ class correct_tracker:
 
     def calc_scaled_move(self,
                          touch_angle,
-                         centroid_pos,
+                         up_cent_y,
                          MOVE_SCALE_RANGE=[-1, 1]):
         """Calculate the horizontal and vertical movements with correction
         
         Arguments:
             touch_angle {[type]} -- [description]
-            centroid_pos {[type]} -- [description]
+            up_cent_y {[type]} -- [description]
         
         Keyword Arguments:
             MOVE_SCALE_RANGE {list} -- [description] (default: {[-1, 1]})
@@ -150,11 +129,11 @@ class correct_tracker:
         Returns:
             [type] -- [description]
         """
-        if touch_angle is None or centroid_pos is None:
+        if touch_angle is None or up_cent_y is None:
             return None, None
 
         dx = scaler(touch_angle, self.touch_base_correct[:2], MOVE_SCALE_RANGE)
-        dy = scaler(self.__coor_to_real_pos(centroid_pos[1]),
+        dy = scaler(self.__coor_to_real_pos(up_cent_y),
                     (self.__coor_to_real_pos(self.touch_base_correct[int(
                         point_type.MIN_Y)]),
                      self.__coor_to_real_pos(self.touch_base_correct[int(
@@ -171,6 +150,9 @@ class correct_tracker:
         Returns:
             [type] -- [description]
         """
+        if y_value is None:
+            return None
+
         value = (2 * y_value * pixel_length) / THUMB_LENGTH / CAMERA_COEFF
         # print(value)
         if abs(value) > 1:
