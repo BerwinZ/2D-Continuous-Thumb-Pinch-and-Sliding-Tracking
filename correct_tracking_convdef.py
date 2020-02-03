@@ -76,7 +76,7 @@ if __name__ == '__main__':
                                                                FRAME_RATE=40)
 
         # Kalman filter to remove noise from the point movement
-        kalman_filter = configure_kalman_filter()
+        kalman_filter = None
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         tracker = touch_trakcer()
@@ -124,7 +124,7 @@ if __name__ == '__main__':
             # 1.3 Get up and down finger contour
             # ---------------------------------------------
             up_contour, down_contour = segment_diff_fingers(
-                contour, defect_points)
+                contour, defect_points, touch_points=None)
 
             # ---------------------------------------------
             # 1.4 Get angle of touch point to the centroid of up contour
@@ -132,7 +132,7 @@ if __name__ == '__main__':
             up_controid = get_centroid(up_contour)
             down_controid = get_centroid(down_contour)
             touch_angle = calc_touch_angle(up_controid, touch_point)
-            touch_angle2 = calc_touch_angle(up_controid, down_controid)
+            # touch_angle2 = calc_touch_angle(up_controid, down_controid)
 
             # ---------------------------------------------
             # 1.5 Draw elements
@@ -187,7 +187,7 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2.2 Draw the movments in the drawing board
             # ---------------------------------------------
-            if dx is not None:
+            if dx is not None and dy is not None:
                 dx = -dx * DRAW_SCALER
                 dy = dy * DRAW_SCALER
             hor_board.draw_filled_point((dx, 0))
@@ -221,6 +221,8 @@ if __name__ == '__main__':
                 else:
                     kalman_filter = None
                     print("Kalman Filter OFF")
+            elif keypress == ord('s'):
+                cv2.imwrite('screenshot.jpg', finger_image)
 
             rawCapture.truncate(0)
 

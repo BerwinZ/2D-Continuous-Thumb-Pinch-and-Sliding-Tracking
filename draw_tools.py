@@ -115,7 +115,9 @@ class draw_board:
             self.points.pop(0)
             for p in self.points:
                 if self._IsValid(p):
-                    cv2.circle(self.board, p, self.radius, color, -1)
+                    cv2.circle(self.board, p, self.radius, [209, 206, 0], -1)
+            if self._IsValid(self.points[-1]):
+                cv2.circle(self.board, p, self.radius, color, -1)
         else:
             if self._IsValid(self.points[-1]):
                 cv2.circle(self.board, new_point, self.radius, color, -1)

@@ -70,7 +70,7 @@ if __name__ == "__main__":
     Get the rawcapture of pi camera and show the live video
     """
     try:
-        camera, rawCapture = configure_camera()
+        camera, rawCapture = configure_camera(640, 480)
         live_video(camera, rawCapture)
     except Exception as e:
         camera.close()
