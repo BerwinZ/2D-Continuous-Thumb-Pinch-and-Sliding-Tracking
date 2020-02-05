@@ -37,11 +37,11 @@ def draw_points(img, points, radius=5, color=[0,255,0]):
         return
     elif type(points) == tuple:
         if points[0] is not None and points[1] is not None:
-            cv2.circle(img, points, radius, color, -1)
+            cv2.circle(img, tuple(points), radius, color, -1)
     elif type(points) == list:
         for p in points:
-            if p:
-                cv2.circle(img, p, radius, color, -1)
+            if p is not None:
+                cv2.circle(img, tuple(p), radius, color, -1)
 
 
 def draw_contours(img, contours, thickness=3, color=[0,255,0]):

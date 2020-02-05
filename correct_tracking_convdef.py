@@ -17,10 +17,11 @@ import sys
 import traceback
 import picamera_control
 from segment_otsu import threshold_masking
-from tracking_convdef import get_defect_points, get_touch_point, configure_kalman_filter, points_distance
+from tracking_convdef import get_defect_points
 from tracking_bound import segment_diff_fingers
 from move_tracker import correct_tracker
 from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
+from math_tools import points_distance
 
 
 def get_centroid(contour):
@@ -67,6 +68,62 @@ def calc_touch_angle(base, target):
         return angle
 
 
+def fit_touch_line(contour, defect_points):
+    """Fit the touch line with polyfit
+    
+    Arguments:
+        contour {[type]} -- [description]
+        defect_points {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if contour is None or defect_points is None:
+        return None, None
+
+    # Fit the function
+    X = contour[:, 0, 0]
+    Y = contour[:, 0, 1]
+    poly = np.poly1d(np.polyfit(X, Y, 4))
+    # Get the touch line x range
+    touch_line_x = np.arange(defect_points[0][0], defect_points[1][0])
+    touch_line_y = np.array(list(map(int, poly(touch_line_x))))
+    # Reshape
+    touch_line_x = np.reshape(touch_line_x, (touch_line_x.shape[0], 1))
+    touch_line_y = np.reshape(touch_line_y, (touch_line_y.shape[0], 1))
+    # Joint
+    touch_line = np.concatenate((touch_line_x, touch_line_y), axis=1)
+    
+    return list(touch_line), poly
+    
+
+def get_touch_point(defect_points, touch_line):
+    """Get the touch point according to the touch line
+    
+    Arguments:
+        defect_points {[type]} -- [description]
+        touch_line {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if defect_points is None or touch_line is None:
+        return None
+
+    # Calculate the middle point
+    (x1, y1), (x2, y2) = defect_points
+    middle_point = ((x1 + x2) // 2, (y1 + y2) // 2)
+
+    # if abs(y2 - y1) < 1e-9:
+    #     touch_point = (int(middle_point[0]), int(touch_line(middle_point[0])))
+    # else:
+    #     grad_direc = -(x2 - x1) / (y2 - y1)
+    #     touch_point = 
+    touch_point = (int(middle_point[0]), int(touch_line(middle_point[0])))
+
+    return touch_point
+
+
 if __name__ == '__main__':
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
@@ -77,10 +134,6 @@ if __name__ == '__main__':
         camera, rawCapture = picamera_control.configure_camera(WIDTH,
                                                                HEIGHT,
                                                                FRAME_RATE=40)
-
-        # Kalman filter to remove noise from the point movement
-        kalman_filter = None
-
         # Show image
         SHOW_IMAGE = True
 
@@ -98,7 +151,7 @@ if __name__ == '__main__':
         print(
             "To calibrate, press 'C' and move the hand in IMAGE LEFT, RIGHT, UP, DOWN"
         )
-        print("Press F to turn ON/OFF the kalman filter")
+        print("Press A to turn ON/OFF the finger image")
         print('-' * 60)
 
         for frame in camera.capture_continuous(rawCapture,
@@ -123,9 +176,7 @@ if __name__ == '__main__':
             defect_points, _ = get_defect_points(contour,
                                                  MIN_CHECK_AREA=100000,
                                                  MIN_DEFECT_DISTANCE=5000)
-            touch_point, filter_touch_point = get_touch_point(
-                defect_points, finger_image, kalman_filter=kalman_filter)
-            
+
             # ---------------------------------------------
             # 1.3 Get up and down finger contour
             # ---------------------------------------------
@@ -133,12 +184,17 @@ if __name__ == '__main__':
                 contour, defect_points, touch_points=None)
 
             # ---------------------------------------------
+            # 1.4 Get touch point
+            # ---------------------------------------------
+            touch_line_points, up_touch_line = fit_touch_line(up_contour, defect_points)
+            touch_point = get_touch_point(defect_points, up_touch_line)
+
+            # ---------------------------------------------
             # 1.4 Get angle of touch point to the centroid of up contour
             # ---------------------------------------------
             up_controid = get_centroid(up_contour)
             down_controid = get_centroid(down_contour)
             touch_angle = calc_touch_angle(up_controid, touch_point)
-            # touch_angle2 = calc_touch_angle(up_controid, down_controid)
 
             # ---------------------------------------------
             # 1.5 Draw elements
@@ -147,20 +203,21 @@ if __name__ == '__main__':
             draw_points(finger_image, defect_points, color=[0, 255, 0])
             # Raw touch point (Red)
             draw_points(finger_image, touch_point, color=[0, 0, 255])
-            # Filter touch point (Blue)
-            draw_points(finger_image, filter_touch_point, color=[255, 0, 0])
-            # Draw contour
-            draw_contours(finger_image2,
-                          up_contour,
-                          thickness=3,
-                          color=[0, 0, 255])
-            draw_contours(finger_image2,
-                          down_contour,
-                          thickness=3,
-                          color=[255, 0, 0])
-            # Draw centroid points
+            # Draw centroid points (Pink)
             draw_points(finger_image, up_controid, color=[255, 0, 255])
             draw_points(finger_image, down_controid, color=[255, 0, 255])
+            
+            # Draw touch line
+            draw_points(finger_image2, touch_line_points, radius=3, color=[255, 0, 0])
+            # Draw contour
+            # draw_contours(finger_image2,
+            #               up_contour,
+            #               thickness=3,
+            #               color=[0, 0, 255])
+            # draw_contours(finger_image2,
+            #               down_contour,
+            #               thickness=3,
+            #               color=[255, 0, 0])
 
             # ---------------------------------------------
             # 1.6 Show image
@@ -180,16 +237,18 @@ if __name__ == '__main__':
             dx, dy = tracker.calc_scaled_move(touch_angle, up_controid[1])
 
 
-            x1 = points_distance(touch_point, up_controid)
-            x2 = points_distance(touch_point, down_controid)
-            if x1 is not None and x2 is not None:
-                x1 = round(x1, 0)
-                x2 = round(x2, 0)
-                x3 = round(x1 + x2, 0)
-                print(x1, x2, x3)
             # ---------------------------------------------
-            # 1.6 Show parameters
+            # 2.2 Show parameters
             # ---------------------------------------------
+            # x1 = points_distance(touch_point, up_controid)
+            # x2 = points_distance(touch_point, down_controid)
+            # if x1 is not None and x2 is not None:
+            #     x1 = round(x1, 0)
+            #     x2 = round(x2, 0)
+            #     x3 = round(x1 + x2, 0)
+            #     print(x1, x2, x3)
+
+
             # if dx is not None and up_contour is not None and defect_points is not None: 
             #     print(round(dx, 2), round(dy, 2), 
             #          cv2.contourArea(up_contour), 
@@ -197,7 +256,7 @@ if __name__ == '__main__':
             #          round(points_distance(defect_points[0], defect_points[1]), 1))
 
             # ---------------------------------------------
-            # 2.2 Draw the movments in the drawing board
+            # 2.3 Draw the movments in the drawing board
             # ---------------------------------------------
             if dx is not None and dy is not None:
                 dx = -dx * DRAW_SCALER
@@ -207,7 +266,7 @@ if __name__ == '__main__':
             hv_board.draw_filled_point((dx, dy))
 
             # ---------------------------------------------
-            # 2.3 Display
+            # 2.4 Display
             # ---------------------------------------------
             move_joint = np.concatenate(
                 (hv_board.board, hor_board.board, ver_board.board), axis=1)
@@ -226,13 +285,6 @@ if __name__ == '__main__':
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
-            elif keypress == ord('f'):
-                if kalman_filter is None:
-                    kalman_filter = configure_kalman_filter()
-                    print("Kalman Filter ON")
-                else:
-                    kalman_filter = None
-                    print("Kalman Filter OFF")
             elif keypress == ord('s'):
                 cv2.imwrite('screenshot.jpg', finger_image)
             elif keypress == ord('a'):
