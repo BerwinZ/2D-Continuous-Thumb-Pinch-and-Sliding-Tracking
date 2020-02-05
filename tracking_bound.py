@@ -55,7 +55,7 @@ def get_touch_line(finger_img, defect_points, line_points_num=10):
     return list(touch_line)
 
 
-def segment_diff_fingers(contour, defect_points, touch_points=None):
+def segment_diff_fingers(contour, defect_points):
     """Segment the contour to the up finger and down finger
 
     Arguments:
@@ -77,29 +77,46 @@ def segment_diff_fingers(contour, defect_points, touch_points=None):
     else:
         grad_direc = (y2 - y1) / (x2 - x1)
         offset = y1 - grad_direc * x1
-        up_finger = contour[grad_direc * contour[:, 0, 0] + offset -
-                            contour[:, 0, 1] >= 0]
-        down_finger = contour[grad_direc * contour[:, 0, 0] + offset -
-                              contour[:, 0, 1] <= 0]
-
-    if touch_points is not None:
-        if type(touch_points) == list:
-            to_add = np.reshape(touch_points,
-                                [len(touch_points), 1, 2])
-        elif type(touch_points) == tuple:
-            to_add = np.reshape(touch_points, [1, 1, 2])
-
-        index1 = np.where((up_finger[:, 0, 0] == x1)
-                          & (up_finger[:, 0, 1] == y1))[0]
-        if index1 is not None and len(index1) != 0:
-            up_finger = np.insert(up_finger, index1[-1] + 1, to_add, axis=0)
-
-        down_finger = np.insert(down_finger,
-                                down_finger.shape[0],
-                                to_add[::-1],
-                                axis=0)
+        segment_line = lambda x, y: grad_direc * x + offset - y
+        up_finger = contour[segment_line(contour[:, 0, 0], contour[:, 0,
+                                                                   1]) >= 0]
+        down_finger = contour[segment_line(contour[:, 0, 0], contour[:, 0,
+                                                                     1]) <= 0]
 
     return up_finger, down_finger
+
+
+def add_touch_line(is_up, contour, defect_points, touch_line):
+    """Add the touch line to the up and down contour
+    
+    Arguments:
+        is_up {bool} -- [description]
+        contour {[type]} -- [description]
+        defect_points {[type]} -- [description]
+        touch_line {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if contour is None or touch_line is None or defect_points is None:
+        return None
+
+    (x1, y1), (x2, y2) = defect_points
+
+    if type(touch_line) == list:
+        to_add = np.reshape(touch_line, [len(touch_line), 1, 2])
+    elif type(touch_line) == tuple:
+        to_add = np.reshape(touch_line, [1, 1, 2])
+
+    if is_up:
+        index = np.where((contour[:, 0, 0] == x1)
+                         & (contour[:, 0, 1] == y1))[0]
+        if index is not None and len(index) != 0:
+            contour = np.insert(contour, index[-1] + 1, to_add, axis=0)
+    else:
+        contour = np.insert(contour, contour.shape[0], to_add[::-1], axis=0)
+
+    return contour
 
 
 def get_bound_points(up_contour, down_contour, height, width):
@@ -233,7 +250,11 @@ if __name__ == '__main__':
 
             # Segment the two fingers
             up_finger_contour, down_finger_contour = segment_diff_fingers(
-                contour, defect_points, touch_line)
+                contour, defect_points)
+            up_finger_contour = add_touch_line(True, up_finger_contour,
+                                               defect_points, touch_line)
+            down_finger_contour = add_touch_line(False, down_finger_contour,
+                                                 defect_points, touch_line)
 
             if up_finger_contour is not None and DRAW_CONTOUR:
                 cv2.drawContours(finger_image, [up_finger_contour], 0,

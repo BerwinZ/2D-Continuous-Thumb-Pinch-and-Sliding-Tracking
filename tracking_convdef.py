@@ -148,7 +148,7 @@ def get_min_gray(gray_img, start_pos, distance=0, slope=None):
 def get_touch_point(defect_points,
                     finger_img,
                     kalman_filter=None):
-    """Get the touch points based on the defect points
+    """Get the touch points based on the defect points and gray value of the image
 
     Arguments:
         defect_points {list of tuple} -- [Two convexity defects points]
