@@ -82,8 +82,9 @@ if __name__ == '__main__':
                                                                IM_WIDTH,
                                                                FRAME_RATE=35)
 
-        threshold1 = 14
-        threshold2 = 14
+        threshold1 = 17
+        threshold2 = 23
+        power = 1
 
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
@@ -109,11 +110,22 @@ if __name__ == '__main__':
                 edge_image = cv2.Canny(window_img,
                                     threshold1=threshold1,
                                     threshold2=threshold2)
+
+                sample_points = np.where(edge_image == 255)
+                line = np.poly1d(np.polyfit(sample_points[0], sample_points[1], power))
+
+                draw_img = window_img.copy()
+                touch_line_x = np.arange(0, draw_img.shape[1])
+                touch_line_y = np.array(list(map(int, line(touch_line_x))))
+                touch_line_x = np.reshape(touch_line_x, (touch_line_x.shape[0], 1))
+                touch_line_y = np.reshape(touch_line_y, (touch_line_y.shape[0], 1))
+                touch_line = np.concatenate((touch_line_x, touch_line_y), axis=1)
+                draw_points(draw_img, list(touch_line), 3)
  
                 window_joint = np.concatenate(
-                    (window_img, edge_image), axis=1
+                    (window_img, edge_image, draw_img), axis=1
                 )
-                draw_vertical_lines(window_joint, 1)
+                draw_vertical_lines(window_joint, 2)
                 cv2.imshow("Window", window_joint)
 
             # Display
@@ -135,6 +147,12 @@ if __name__ == '__main__':
             elif keypress == ord('i'):    # DOWN
                 threshold2 += 1
                 print("Thres1", threshold1, "Thres2", threshold2)
+            elif keypress == ord('m'):
+                power += 1
+                print("Fitting Power", power)
+            elif keypress == ord('n'):
+                power -= 1
+                print("Fitting Power", power)   
             rawCapture.truncate(0)
 
         camera.close()
