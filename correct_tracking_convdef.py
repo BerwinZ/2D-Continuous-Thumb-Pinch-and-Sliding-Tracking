@@ -15,11 +15,11 @@ import numpy as np
 from time import sleep
 import sys
 import traceback
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, curve_fit
 import picamera_control
 from segment_otsu import threshold_masking
 from tracking_convdef import get_defect_points
-from tracking_bound import segment_diff_fingers, add_touch_line
+from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_points
 from move_tracker import correct_tracker
 from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
 from math_tools import points_distance
@@ -70,62 +70,100 @@ def calc_touch_angle(base, target):
         return angle
 
 
-def fit_touch_line(contour, defect_points):
-    """Fit the touch line with polyfit using the points of the contour
+def fit_touch_line(contour,
+                   bound_points,
+                   is_up,
+                   fitting_curve,
+                   defect_points,
+                   draw_image=None):
+    """Fit the touch line with polyfit using the points of the contour within the bound points
     
     Arguments:
         contour {[type]} -- [description]
+        bound_points {[type]} -- [description]
+        is_up {bool} -- [description]
+        fitting_curve {[type]} -- [description]
         defect_points {[type]} -- [description]
+    
+    Keyword Arguments:
+        draw_image {[type]} -- [description] (default: {None})
     
     Returns:
         touch_line_points [2-d list] -- [description]
-        poly [lambda function]
+        curve [lambda function]
     """
-    if contour is None or defect_points is None:
+    if contour is None or bound_points is None or bound_points[
+            0] is None or bound_points[
+                1] is None or fitting_curve is None or defect_points is None:
         return None, None
 
-    contour = contour[contour[:, 0, 1] > 0]
+    # Get the points used to fit
+    (x1, y1), (x2, y2) = bound_points[0], bound_points[1]
+    slope = (y2 - y1) / (x2 - x1)
+    f = lambda x, y: slope * (x - x1) - (y - y1)
+    if is_up:
+        contour = contour[f(contour[:, 0, 0], contour[:, 0, 1]) < 0]
+    else:
+        contour = contour[f(contour[:, 0, 0], contour[:, 0, 1]) >= 0]
+
+    if draw_image is not None:
+        color = [0, 0, 255] if is_up else [255, 0, 0]
+        draw_points(draw_image,
+                    np.reshape(contour, (contour.shape[0], 2)),
+                    radius=3,
+                    color=color)
+
     # Fit the function
     X = contour[:, 0, 0]
     Y = contour[:, 0, 1]
-    poly = np.poly1d(np.polyfit(X, Y, 4))
+    curve = fitting_curve(X, Y)
     # Get the touch line x range
     touch_line_x = np.arange(defect_points[0][0], defect_points[1][0])
-    touch_line_y = np.array(list(map(int, poly(touch_line_x))))
+    touch_line_y = np.array(list(map(int, curve(touch_line_x))))
     # Reshape
     touch_line_x = np.reshape(touch_line_x, (touch_line_x.shape[0], 1))
     touch_line_y = np.reshape(touch_line_y, (touch_line_y.shape[0], 1))
     # Joint
     touch_line = np.concatenate((touch_line_x, touch_line_y), axis=1)
 
-    return list(touch_line), poly
+    return list(touch_line), curve
 
 
-def get_touch_point(defect_points, touch_line):
+def get_touch_point(defect_points,
+                    up_touch_line,
+                    down_ellipse,
+                    in_up_line=True):
     """Get the touch point according to the defect points and touch line.
     
     Arguments:
         defect_points {[type]} -- [description]
-        touch_line {[type]} -- [description]
+        up_touch_line {[type]} -- [description]
     
     Returns:
         [type] -- [description]
     """
-    if defect_points is None or touch_line is None:
+    if defect_points is None or up_touch_line is None or down_ellipse is None:
         return None
 
     # Calculate the middle point
     (x1, y1), (x2, y2) = defect_points
     middle_point = ((x1 + x2) // 2, (y1 + y2) // 2)
 
-    # Find the intersection of the touch_line and the vertical bisector of the defect points
-    if abs(y2 - y1) < 1e-9:
-        touch_point = (int(middle_point[0]), int(touch_line(middle_point[0])))
+    # Find the intersection of the up_touch_line and the vertical bisector of the defect points
+    if in_up_line:
+        if abs(y2 - y1) < 1e-9:
+            touch_point = (int(middle_point[0]),
+                           int(up_touch_line(middle_point[0])))
+        else:
+            k = -(x2 - x1) / (y2 - y1)
+            line = lambda x: k * x + middle_point[1] - k * middle_point[0]
+            intersec = fsolve(lambda x: line(x) - up_touch_line(x),
+                              middle_point[0])
+            touch_point = (int(intersec), int(line(intersec)))
     else:
-        k = -(x2 - x1) / (y2 - y1)
-        line = lambda x: k * x + middle_point[1] - k * middle_point[0]
-        intersec = fsolve(lambda x: line(x) - touch_line(x), middle_point[0])
-        touch_point = (int(intersec), int(line(intersec)))
+        pass
+        # TODO: Get the intersection between line and ellipse
+        # center, axes_len, angle = down_ellipse
 
     return touch_point
 
@@ -135,10 +173,10 @@ if __name__ == '__main__':
     This function get the frame from the camera, and use thresholding to finger_image the hand part
     """
     try:
-        WIDTH, HEIGHT = 640, 480
+        IM_WIDTH, IM_HEIGHT = 640, 480
         # Note: Higher framerate will bring noise to the segmented image
-        camera, rawCapture = picamera_control.configure_camera(WIDTH,
-                                                               HEIGHT,
+        camera, rawCapture = picamera_control.configure_camera(IM_WIDTH,
+                                                               IM_HEIGHT,
                                                                FRAME_RATE=40)
         # Show image
         SHOW_IMAGE = True
@@ -190,27 +228,62 @@ if __name__ == '__main__':
                 contour, defect_points)
 
             # ---------------------------------------------
-            # 1.4 Get touch line and touch point
+            # 1.4 Get touch lines
             # ---------------------------------------------
-            line_points, up_touch_line = fit_touch_line(
-                up_contour, defect_points)
-            touch_point = get_touch_point(defect_points, up_touch_line)
-            
-            # ---------------------------------------------
-            # 1.5 Add fitted touch line to the contour
-            # ---------------------------------------------
-            up_contour = add_touch_line(True, up_contour, defect_points,
-                                        line_points)
+            top_left, top_right, bottom_left, bottom_right = get_bound_points(
+                up_contour, down_contour, IM_HEIGHT, IM_WIDTH)
+
+            up_TL_points, up_touch_line = fit_touch_line(
+                up_contour,
+                bound_points=(top_left, top_right),
+                is_up=True,
+                fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 4)),
+                defect_points=defect_points,
+                draw_image=finger_image)
+
+            up_contour = add_touch_line(is_up=True,
+                                        contour=up_contour,
+                                        defect_points=defect_points,
+                                        touch_line=up_TL_points)
+
+            if down_contour is not None:
+                most_right = np.where(
+                    down_contour[:, 0, 0] == max(down_contour[:, 0, 0]))[0]
+                if len(most_right) > 0:
+                    most_right = tuple(down_contour[most_right[0], 0, :])
+                else:
+                    most_right = None
+
+                down_TL_points, down_touch_line = fit_touch_line(
+                    down_contour,
+                    bound_points=(bottom_left, most_right),
+                    is_up=False,
+                    fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 2)),
+                    defect_points=defect_points,
+                    draw_image=finger_image)
+                draw_points(finger_image, down_TL_points, 3, [255, 0, 0])
+
+            down_ellipse = None
+            if down_contour is not None:
+                down_ellipse = cv2.fitEllipse(down_contour)
 
             # ---------------------------------------------
-            # 1.6 Get angle of touch point to the centroid of up contour
+            # 1.6 Get centroids of contours
             # ---------------------------------------------
             up_controid = get_centroid(up_contour)
             down_controid = get_centroid(down_contour)
+
+            # ---------------------------------------------
+            # 1.7 Get touch point and get the touch angle of touch point to the centroid
+            # ---------------------------------------------
+            # TODO: Modify the in_up_line
+            in_up_line = True
+            touch_point = get_touch_point(defect_points, up_touch_line,
+                                          down_ellipse, in_up_line)
             touch_angle = calc_touch_angle(up_controid, touch_point)
 
             # ---------------------------------------------
-            # 1.7 Draw elements
+            # 1.8 Draw elements
             # ---------------------------------------------
             # Two defect points (Green)
             draw_points(finger_image, defect_points, color=[0, 255, 0])
@@ -226,12 +299,11 @@ if __name__ == '__main__':
                           thickness=3,
                           color=[0, 0, 255])
             # Draw down contour
-            if down_contour is not None:
-                ellipse = cv2.fitEllipse(down_contour)
-                cv2.ellipse(finger_image2, ellipse, (0, 255, 0), 2)
-            
+            if down_ellipse is not None:
+                cv2.ellipse(finger_image2, down_ellipse, (0, 255, 0), 2)
+
             # ---------------------------------------------
-            # 1.8 Show image
+            # 1.9 Show image
             # ---------------------------------------------
             if SHOW_IMAGE:
                 image_joint = np.concatenate(

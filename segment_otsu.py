@@ -51,7 +51,7 @@ def threshold_masking(img):
 
     # Get the all contours, CHAIN_APPROX_NONE means get all the points
     _, contours, _ = cv2.findContours(mask, cv2.RETR_CCOMP,
-                                      cv2.CHAIN_APPROX_SIMPLE)
+                                      cv2.CHAIN_APPROX_NONE)
     max_contour = None
 
     # Get the contour with max area

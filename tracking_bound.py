@@ -76,8 +76,7 @@ def segment_diff_fingers(contour, defect_points):
         down_finger = contour[contour[:, 0, 0] >= x1]
     else:
         grad_direc = (y2 - y1) / (x2 - x1)
-        offset = y1 - grad_direc * x1
-        segment_line = lambda x, y: grad_direc * x + offset - y
+        segment_line = lambda x, y: grad_direc * (x - x1) - (y - y1)
         up_finger = contour[segment_line(contour[:, 0, 0], contour[:, 0,
                                                                    1]) >= 0]
         down_finger = contour[segment_line(contour[:, 0, 0], contour[:, 0,
@@ -131,7 +130,7 @@ def get_bound_points(up_contour, down_contour, height, width):
     Returns:
         Boundary Points [list of tuple] -- [top_left, top_right, bottom_left, bottom_right]
     """
-    if up_contour is None or down_contour is None:
+    if up_contour is None or down_contour is None or height is None or width is None:
         return None, None, None, None
 
     top_left = None

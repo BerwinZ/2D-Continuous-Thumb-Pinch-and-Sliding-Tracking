@@ -42,6 +42,9 @@ def draw_points(img, points, radius=5, color=[0,255,0]):
         for p in points:
             if p is not None:
                 cv2.circle(img, tuple(p), radius, color, -1)
+    elif type(points) == np.ndarray:
+        for i in range(points.shape[0]):
+            cv2.circle(img, tuple(points[i, :]), radius, color, -1)
 
 
 def draw_contours(img, contours, thickness=3, color=[0,255,0]):
