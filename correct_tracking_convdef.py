@@ -18,6 +18,7 @@ import traceback
 from scipy.optimize import fsolve, curve_fit
 import picamera_control
 from segment_otsu import threshold_masking
+from segment_edge import sobel_filters
 from tracking_convdef import get_defect_points
 from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_points
 from move_tracker import correct_tracker
@@ -117,10 +118,9 @@ def fit_lost_contour(is_up,
             f = lambda x, y: (y2 - y1) / (x2 - x1) * (x - x1) - (y - y1)
             contour = contour[f(contour[:, 0], contour[:, 1]) > 0]
 
-        T = np.array([[np.cos(theta), -np.sin(theta)],
-                      [np.sin(theta), np.cos(theta)]])
-        contour = T.dot(contour.T).T
-        defect_points = T.dot(np.array(defect_points).T).T
+        rotate = rotate_array(theta)
+        contour = rotate.dot(contour.T).T
+        defect_points = rotate.dot(np.array(defect_points).T).T
 
     # Draw it
     if draw_image is not None:
@@ -144,21 +144,42 @@ def fit_lost_contour(is_up,
 
     if is_up is False:
         draw_points(draw_image, points.astype("int"), 3, [255, 0, 0])
-        T = np.array([[np.cos(-theta), -np.sin(-theta)],
-                      [np.sin(-theta), np.cos(-theta)]])
-        points = T.dot(points.T).T
+        rotate = rotate_array(-theta)
+        points = rotate.dot(points.T).T
 
     points = points.astype("int")
 
     return points, curve, theta
 
 
-def get_touch_point(defect_points, 
-                    up_centroid, 
-                    down_centroid, 
+def get_intersection(defect_points, curve):
+    # Calculate the middle point
+    (x1, y1), (x2, y2) = defect_points
+    middle_point = ((x1 + x2) // 2, (y1 + y2) // 2)
+
+    if abs(y2 - y1) < 1e-9:
+        touch_point = (middle_point[0], curve(middle_point[0]))
+    else:
+        k = -(x2 - x1) / (y2 - y1)
+        line = lambda x: k * x + middle_point[1] - k * middle_point[0]
+        intersec = fsolve(lambda x: line(x) - curve(x), middle_point[0])[0]
+        touch_point = (intersec, line(intersec))
+
+    return touch_point
+
+
+def rotate_array(theta):
+    return np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
+
+
+def get_touch_point(defect_points,
+                    up_centroid,
+                    down_centroid,
                     up_touch_line,
-                    down_touch_line, 
-                    theta):
+                    down_touch_line,
+                    theta,
+                    finger_image=None):
     """Get the touch point according to the defect points and touch line.
     
     Arguments:
@@ -178,34 +199,26 @@ def get_touch_point(defect_points,
     distance_ratio = points_distance(middle_point,
                                      up_centroid) / points_distance(
                                          middle_point, down_centroid)
-
-
-    if distance_ratio > 1:
-        curve = up_touch_line
+    if distance_ratio >= 1:
+        touch_point = get_intersection(defect_points, up_touch_line)
     else:
-        curve = down_touch_line
-        rotate = np.array([[np.cos(theta), -np.sin(theta)],
-                           [np.sin(theta), np.cos(theta)]])
-        defect_points = rotate.dot(np.array(defect_points).T).T
-        [x1, y1], [x2, y2] = defect_points
-        middle_point = rotate.dot(np.array([middle_point]).T).T[0]
+        rotate = rotate_array(theta)
+        r_defect_points = rotate.dot(np.array(defect_points).T).T
+        touch_point = get_intersection(r_defect_points, down_touch_line)
 
-    # Find the intersection of the touch_line and the vertical bisector of the defect points
-    if abs(y2 - y1) < 1e-9:
-        touch_point = (middle_point[0], curve(middle_point[0]))
-    else:
-        k = -(x2 - x1) / (y2 - y1)
-        line = lambda x: k * x + middle_point[1] - k * middle_point[0]
-        intersec = fsolve(lambda x: line(x) - curve(x), middle_point[0])[0]
-        touch_point = (intersec, line(intersec))
-    
-    # Rotate back
-    if distance_ratio < 1:
-        rotate = np.array([[np.cos(-theta), -np.sin(-theta)],
-                           [np.sin(-theta), np.cos(-theta)]])
+        rotate = rotate_array(-theta)
         touch_point = rotate.dot(np.array([touch_point]).T).T[0]
 
-    touch_point = ((int)(touch_point[0]), (int)(touch_point[1]))
+        if distance_ratio >= 0.65:
+            tmp = get_intersection(defect_points, up_touch_line)
+            touch_point = ((touch_point[0] + tmp[0]) / 2,
+                           (touch_point[1] + tmp[1]) / 2)
+
+    touch_point = tuple(map(int, touch_point))
+
+    if finger_image is not None:
+        G, _ = sobel_filters(cv2.cvtColor(finger_image, cv2.COLOR_BGR2GRAY))
+
     return touch_point
 
 
@@ -282,7 +295,7 @@ if __name__ == '__main__':
                 defect_points=defect_points,
                 draw_image=None)
             draw_points(finger_image, up_LC_points, 3, [0, 0, 255])
-            
+
             down_LC_points, down_touch_line, theta = fit_lost_contour(
                 is_up=False,
                 contour=down_contour,

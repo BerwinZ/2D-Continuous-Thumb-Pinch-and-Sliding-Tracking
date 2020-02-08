@@ -33,7 +33,7 @@ def sobel_filters(img):
     G = G / G.max() * 255
     theta = np.arctan2(Iy, Ix)
 
-    return G, theta, Iy
+    return G, theta
 
 
 def non_max_suppression(img, D):
