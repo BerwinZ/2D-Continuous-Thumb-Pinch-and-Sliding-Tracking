@@ -184,11 +184,11 @@ def get_touch_point(defect_points,
         curve = up_touch_line
     else:
         curve = down_touch_line
-        T = np.array([[np.cos(theta), -np.sin(theta)],
-                      [np.sin(theta), np.cos(theta)]])
-        defect_points = T.dot(np.array(defect_points).T).T
+        rotate = np.array([[np.cos(theta), -np.sin(theta)],
+                           [np.sin(theta), np.cos(theta)]])
+        defect_points = rotate.dot(np.array(defect_points).T).T
         [x1, y1], [x2, y2] = defect_points
-        middle_point = T.dot(np.array([middle_point]).T).T[0]
+        middle_point = rotate.dot(np.array([middle_point]).T).T[0]
 
     # Find the intersection of the touch_line and the vertical bisector of the defect points
     if abs(y2 - y1) < 1e-9:
@@ -198,15 +198,13 @@ def get_touch_point(defect_points,
         line = lambda x: k * x + middle_point[1] - k * middle_point[0]
         intersec = fsolve(lambda x: line(x) - curve(x), middle_point[0])[0]
         touch_point = (intersec, line(intersec))
-        
-    if distance_ratio < 1:
-        T = np.array([[np.cos(-theta), -np.sin(-theta)],
-                      [np.sin(-theta), np.cos(-theta)]])
-        tmp = np.array([[touch_point[0]],
-                        [touch_point[1]]])
-        touch_point = T.dot(tmp)
-        touch_point = (touch_point[0][0], touch_point[1][0])
     
+    # Rotate back
+    if distance_ratio < 1:
+        rotate = np.array([[np.cos(-theta), -np.sin(-theta)],
+                           [np.sin(-theta), np.cos(-theta)]])
+        touch_point = rotate.dot(np.array([touch_point]).T).T[0]
+
     touch_point = ((int)(touch_point[0]), (int)(touch_point[1]))
     return touch_point
 
