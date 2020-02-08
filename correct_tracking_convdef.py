@@ -70,13 +70,13 @@ def calc_touch_angle(base, target):
         return angle
 
 
-def fit_touch_line(contour,
-                   bound_points,
-                   is_up,
-                   fitting_curve,
-                   defect_points,
-                   draw_image=None):
-    """Fit the touch line with polyfit using the points of the contour within the bound points
+def fit_lost_contour(is_up,
+                     contour,
+                     bound_points,
+                     fitting_curve,
+                     defect_points,
+                     draw_image=None):
+    """Fit the up contour with polyfit using the points of the contour within the bound points
     
     Arguments:
         contour {[type]} -- [description]
@@ -92,47 +92,73 @@ def fit_touch_line(contour,
         touch_line_points [2-d list] -- [description]
         curve [lambda function]
     """
-    if contour is None or bound_points is None or bound_points[
-            0] is None or bound_points[
-                1] is None or fitting_curve is None or defect_points is None:
-        return None, None
+    if contour is None or fitting_curve is None or defect_points is None:
+        return None, None, None
 
     # Get the points used to fit
-    (x1, y1), (x2, y2) = bound_points[0], bound_points[1]
-    slope = (y2 - y1) / (x2 - x1)
-    f = lambda x, y: slope * (x - x1) - (y - y1)
-    if is_up:
-        contour = contour[f(contour[:, 0, 0], contour[:, 0, 1]) < 0]
-    else:
-        contour = contour[f(contour[:, 0, 0], contour[:, 0, 1]) >= 0]
+    if bound_points is None or bound_points[0] is None or bound_points[
+            1] is None:
+        return None, None, None
 
+    (x1, y1), (x2, y2) = bound_points[0], bound_points[1]
+    contour = np.reshape(contour, (contour.shape[0], 2))
+    theta = None
+
+    if is_up:
+        f = lambda x, y: (y2 - y1) / (x2 - x1) * (x - x1) - (y - y1)
+        contour = contour[f(contour[:, 0], contour[:, 1]) < 0]
+    else:
+        # Rotate points
+        if abs(x1 - x2) < 1e-9:
+            theta = -1 * 90 * np.pi / 180
+            contour = contour[contour[:, 0] > 0]
+        else:
+            theta = -1 * np.arctan((y2 - y1) / (x2 - x1))
+            f = lambda x, y: (y2 - y1) / (x2 - x1) * (x - x1) - (y - y1)
+            contour = contour[f(contour[:, 0], contour[:, 1]) > 0]
+
+        T = np.array([[np.cos(theta), -np.sin(theta)],
+                      [np.sin(theta), np.cos(theta)]])
+        contour = T.dot(contour.T).T
+        defect_points = T.dot(np.array(defect_points).T).T
+
+    # Draw it
     if draw_image is not None:
         color = [0, 0, 255] if is_up else [255, 0, 0]
-        draw_points(draw_image,
-                    np.reshape(contour, (contour.shape[0], 2)),
-                    radius=3,
-                    color=color)
+        draw_points(draw_image, contour.astype("int"), radius=3, color=color)
 
     # Fit the function
-    X = contour[:, 0, 0]
-    Y = contour[:, 0, 1]
+    X = contour[:, 0]
+    Y = contour[:, 1]
     curve = fitting_curve(X, Y)
+
     # Get the touch line x range
-    touch_line_x = np.arange(defect_points[0][0], defect_points[1][0])
-    touch_line_y = np.array(list(map(int, curve(touch_line_x))))
+    p_x = np.arange(defect_points[0][0], defect_points[1][0])
+    p_y = np.array(curve(p_x))
     # Reshape
-    touch_line_x = np.reshape(touch_line_x, (touch_line_x.shape[0], 1))
-    touch_line_y = np.reshape(touch_line_y, (touch_line_y.shape[0], 1))
+    num = p_x.shape[0]
+    p_x = np.reshape(p_x, (num, 1))
+    p_y = np.reshape(p_y, (num, 1))
     # Joint
-    touch_line = np.concatenate((touch_line_x, touch_line_y), axis=1)
+    points = np.concatenate((p_x, p_y), axis=1)
 
-    return list(touch_line), curve
+    if is_up is False:
+        draw_points(draw_image, points.astype("int"), 3, [255, 0, 0])
+        T = np.array([[np.cos(-theta), -np.sin(-theta)],
+                      [np.sin(-theta), np.cos(-theta)]])
+        points = T.dot(points.T).T
+
+    points = points.astype("int")
+
+    return points, curve, theta
 
 
-def get_touch_point(defect_points,
+def get_touch_point(defect_points, 
+                    up_centroid, 
+                    down_centroid, 
                     up_touch_line,
-                    down_ellipse,
-                    in_up_line=True):
+                    down_touch_line, 
+                    theta):
     """Get the touch point according to the defect points and touch line.
     
     Arguments:
@@ -142,29 +168,46 @@ def get_touch_point(defect_points,
     Returns:
         [type] -- [description]
     """
-    if defect_points is None or up_touch_line is None or down_ellipse is None:
+    if defect_points is None or up_centroid is None or down_centroid is None or up_touch_line is None or down_touch_line is None or theta is None:
         return None
 
     # Calculate the middle point
     (x1, y1), (x2, y2) = defect_points
     middle_point = ((x1 + x2) // 2, (y1 + y2) // 2)
 
-    # Find the intersection of the up_touch_line and the vertical bisector of the defect points
-    if in_up_line:
-        if abs(y2 - y1) < 1e-9:
-            touch_point = (int(middle_point[0]),
-                           int(up_touch_line(middle_point[0])))
-        else:
-            k = -(x2 - x1) / (y2 - y1)
-            line = lambda x: k * x + middle_point[1] - k * middle_point[0]
-            intersec = fsolve(lambda x: line(x) - up_touch_line(x),
-                              middle_point[0])
-            touch_point = (int(intersec), int(line(intersec)))
-    else:
-        pass
-        # TODO: Get the intersection between line and ellipse
-        # center, axes_len, angle = down_ellipse
+    distance_ratio = points_distance(middle_point,
+                                     up_centroid) / points_distance(
+                                         middle_point, down_centroid)
 
+
+    if distance_ratio > 1:
+        curve = up_touch_line
+    else:
+        curve = down_touch_line
+        T = np.array([[np.cos(theta), -np.sin(theta)],
+                      [np.sin(theta), np.cos(theta)]])
+        defect_points = T.dot(np.array(defect_points).T).T
+        [x1, y1], [x2, y2] = defect_points
+        middle_point = T.dot(np.array([middle_point]).T).T[0]
+
+    # Find the intersection of the touch_line and the vertical bisector of the defect points
+    if abs(y2 - y1) < 1e-9:
+        touch_point = (middle_point[0], curve(middle_point[0]))
+    else:
+        k = -(x2 - x1) / (y2 - y1)
+        line = lambda x: k * x + middle_point[1] - k * middle_point[0]
+        intersec = fsolve(lambda x: line(x) - curve(x), middle_point[0])[0]
+        touch_point = (intersec, line(intersec))
+        
+    if distance_ratio < 1:
+        T = np.array([[np.cos(-theta), -np.sin(-theta)],
+                      [np.sin(-theta), np.cos(-theta)]])
+        tmp = np.array([[touch_point[0]],
+                        [touch_point[1]]])
+        touch_point = T.dot(tmp)
+        touch_point = (touch_point[0][0], touch_point[1][0])
+    
+    touch_point = ((int)(touch_point[0]), (int)(touch_point[1]))
     return touch_point
 
 
@@ -233,54 +276,40 @@ if __name__ == '__main__':
             top_left, top_right, bottom_left, bottom_right = get_bound_points(
                 up_contour, down_contour, IM_HEIGHT, IM_WIDTH)
 
-            up_TL_points, up_touch_line = fit_touch_line(
-                up_contour,
-                bound_points=(top_left, top_right),
+            up_LC_points, up_touch_line, _ = fit_lost_contour(
                 is_up=True,
+                contour=up_contour,
+                bound_points=(top_left, top_right),
                 fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 4)),
                 defect_points=defect_points,
-                draw_image=finger_image)
-
-            up_contour = add_touch_line(is_up=True,
-                                        contour=up_contour,
-                                        defect_points=defect_points,
-                                        touch_line=up_TL_points)
-
-            if down_contour is not None:
-                most_right = np.where(
-                    down_contour[:, 0, 0] == max(down_contour[:, 0, 0]))[0]
-                if len(most_right) > 0:
-                    most_right = tuple(down_contour[most_right[0], 0, :])
-                else:
-                    most_right = None
-
-                down_TL_points, down_touch_line = fit_touch_line(
-                    down_contour,
-                    bound_points=(bottom_left, most_right),
-                    is_up=False,
-                    fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 2)),
-                    defect_points=defect_points,
-                    draw_image=finger_image)
-                draw_points(finger_image, down_TL_points, 3, [255, 0, 0])
-
-            down_ellipse = None
-            if down_contour is not None:
-                down_ellipse = cv2.fitEllipse(down_contour)
+                draw_image=None)
+            draw_points(finger_image, up_LC_points, 3, [0, 0, 255])
+            
+            down_LC_points, down_touch_line, theta = fit_lost_contour(
+                is_up=False,
+                contour=down_contour,
+                bound_points=(bottom_left, bottom_right),
+                fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 3)),
+                defect_points=defect_points,
+                draw_image=None)
+            draw_points(finger_image, down_LC_points, 3, [255, 0, 0])
 
             # ---------------------------------------------
-            # 1.6 Get centroids of contours
+            # 1.5 Get centroids of contours
             # ---------------------------------------------
-            up_controid = get_centroid(up_contour)
-            down_controid = get_centroid(down_contour)
+            up_centroid = get_centroid(up_contour)
+            down_centroid = get_centroid(down_contour)
 
             # ---------------------------------------------
             # 1.7 Get touch point and get the touch angle of touch point to the centroid
             # ---------------------------------------------
-            # TODO: Modify the in_up_line
-            in_up_line = True
-            touch_point = get_touch_point(defect_points, up_touch_line,
-                                          down_ellipse, in_up_line)
-            touch_angle = calc_touch_angle(up_controid, touch_point)
+            touch_point = get_touch_point(defect_points=defect_points,
+                                          up_centroid=up_centroid,
+                                          down_centroid=down_centroid,
+                                          up_touch_line=up_touch_line,
+                                          down_touch_line=down_touch_line,
+                                          theta=theta)
+            touch_angle = calc_touch_angle(up_centroid, touch_point)
 
             # ---------------------------------------------
             # 1.8 Draw elements
@@ -288,19 +317,20 @@ if __name__ == '__main__':
             # Two defect points (Green)
             draw_points(finger_image, defect_points, color=[0, 255, 0])
             # Raw touch point (Red)
-            draw_points(finger_image, touch_point, color=[0, 0, 255])
+            draw_points(finger_image, touch_point, color=[255, 255, 255])
             # Draw centroid points (Pink)
-            draw_points(finger_image, up_controid, color=[255, 0, 255])
-            draw_points(finger_image, down_controid, color=[255, 0, 255])
+            draw_points(finger_image, up_centroid, color=[255, 0, 255])
+            draw_points(finger_image, down_centroid, color=[255, 0, 255])
 
             # Draw up contour
             draw_contours(finger_image2,
                           up_contour,
                           thickness=3,
                           color=[0, 0, 255])
-            # Draw down contour
-            if down_ellipse is not None:
-                cv2.ellipse(finger_image2, down_ellipse, (0, 255, 0), 2)
+            draw_contours(finger_image2,
+                          down_contour,
+                          thickness=3,
+                          color=[255, 0, 0])
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -318,13 +348,13 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2.1 Use tracker to calculate the movements
             # ---------------------------------------------
-            dx, dy = tracker.calc_scaled_move(touch_angle, up_controid[1])
+            dx, dy = tracker.calc_scaled_move(touch_angle, up_centroid[1])
 
             # ---------------------------------------------
             # 2.2 Show parameters
             # ---------------------------------------------
-            # x1 = points_distance(touch_point, up_controid)
-            # x2 = points_distance(touch_point, down_controid)
+            # x1 = points_distance(touch_point, up_centroid)
+            # x2 = points_distance(touch_point, down_centroid)
             # if x1 is not None and x2 is not None:
             #     x1 = round(x1, 0)
             #     x2 = round(x2, 0)
@@ -363,7 +393,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(touch_angle, up_controid[1])
+                tracker.calibrate_touch_point(touch_angle, up_centroid[1])
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()

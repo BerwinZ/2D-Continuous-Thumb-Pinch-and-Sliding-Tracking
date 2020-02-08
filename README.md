@@ -25,6 +25,31 @@ This repo is used to track the thumb's touch position relatived to other fintert
 
 pi@192.168.137.209:/home/pi/mcrpnh
 
+## Steps
+
+### Find the touch line between two fingers
+
+#### Fit a curve using the contour points
+
+Up contour can work with a 4 ladder poly, but Down contour cannot because it is not a poly function
+
+#### Rotate the down contour points, then rotate the fitted curve back
+
+Not work, rotated line cannot fit the boundary
+
+#### Fit a ellipse for the down contour
+
+Cannot work, shape is not fitted and cannot find the intersection between the ellipse with the line
+
+#### Detect the touch line with the Canny algorithm
+
+Cannot work because it is very hard to detect
+
+#### Fit a curve, then find the nearest points, then fit again
+
+May work
+
+
 ## Reference
 
 1. [Histogram Backprojection](https://docs.opencv.org/master/dc/df6/tutorial_py_histogram_backprojection.html)
