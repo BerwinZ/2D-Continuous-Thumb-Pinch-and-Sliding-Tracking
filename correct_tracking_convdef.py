@@ -281,6 +281,28 @@ def __get_min_grad(gray_img, defect_points, start_point):
         return start_point
 
 
+
+def get_circle(p1, p2, p3):
+    if p1 is None or p2 is None or p3 is None:
+        return None
+
+    a = 2*(p2[0]-p1[0])
+    b = 2*(p2[1]-p1[1])
+    c = p2[0]*p2[0]+p2[1]*p2[1]-p1[0]*p1[0]-p1[1]*p1[1]
+    d = 2*(p3[0]-p2[0])
+    e = 2*(p3[1]-p2[1])
+    f = p3[0]*p3[0]+p3[1]*p3[1]-p2[0]*p2[0]-p2[1]*p2[1]
+    if b*d-e*a == 0:
+        return None
+
+    x = (b*f-e*c)/(b*d-e*a)
+    y = (d*c-a*f)/(b*d-e*a)
+
+    center = ((int)(x), (int)(y))
+
+    return center
+
+
 if __name__ == '__main__':
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
@@ -368,7 +390,7 @@ if __name__ == '__main__':
             down_centroid = get_centroid(down_contour)
 
             # ---------------------------------------------
-            # 1.6 Get touch point and get the touch angle of touch point to the centroid
+            # 1.6 Get touch point 
             # ---------------------------------------------
             touch_point = get_touch_point(defect_points=defect_points,
                                           up_centroid=up_centroid,
@@ -377,7 +399,17 @@ if __name__ == '__main__':
                                           down_touch_line=down_touch_line,
                                           theta=theta,
                                           image_for_grad=None)
-            touch_angle = calc_touch_angle(up_centroid, touch_point)
+            
+            # ---------------------------------------------
+            # 1.7 Get some parameters 
+            # ---------------------------------------------
+            # touch_angle = None
+            # if defect_points is not None:
+            #     center = get_circle(defect_points[0], defect_points[1], touch_point)
+            #     # draw_points(finger_image, center, color=[255, 0, 255])
+            #     touch_angle = calc_touch_angle(center, touch_point)
+
+            # real_x = tracker.coor_to_real_len(up_touch_line, up_centroid, touch_point)
 
             # ---------------------------------------------
             # 1.8 Draw elements
@@ -387,8 +419,8 @@ if __name__ == '__main__':
             # Raw touch point (Red)
             draw_points(finger_image, touch_point, color=[255, 255, 255])
             # Draw centroid points (Pink)
-            draw_points(finger_image, up_centroid, color=[255, 0, 255])
-            draw_points(finger_image, down_centroid, color=[255, 0, 255])
+            draw_points(finger_image, up_centroid, color=[255, 0, 0])
+            draw_points(finger_image, down_centroid, color=[255, 0, 0])
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -406,7 +438,7 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2.1 Use tracker to calculate the movements
             # ---------------------------------------------
-            dx, dy = tracker.calc_scaled_move(touch_angle, up_centroid[1])
+            dx, dy = tracker.calc_scaled_move(up_touch_line, up_centroid, touch_point)
 
             # ---------------------------------------------
             # 2.2 Show parameters
@@ -451,7 +483,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(touch_angle, up_centroid[1])
+                tracker.calibrate_touch_point(up_touch_line, up_centroid, touch_point)
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
