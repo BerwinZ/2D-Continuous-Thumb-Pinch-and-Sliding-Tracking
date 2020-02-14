@@ -135,3 +135,11 @@ media/
 # VS Code
 .idea/
 .vscode/
+
+# Sample folders
+python_samples/
+
+# Other folders
+images/
+images_crop/
+Backup/

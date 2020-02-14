@@ -31,11 +31,11 @@ pi@192.168.137.209:/home/pi/mcrpnh
 
 #### Fit a curve using the contour points
 
-Up contour can work with a 4 ladder poly, but Down contour cannot because it is not a poly function
+Up contour can work with a 4 ladder poly, but Down contour cannot because it is not a function.
 
 #### Rotate the down contour points, then rotate the fitted curve back
 
-Not work, rotated line cannot fit the boundary
+Work only when the thumb move up.
 
 #### Fit a ellipse for the down contour
 
@@ -48,6 +48,15 @@ Cannot work because it is very hard to detect
 #### Fit a curve, then find the nearest points, then fit again
 
 May work
+
+### Decide the touch point
+
+When thumb is up, use the intersection point of up touch line generated from thumb contour. When the thumb is down, use the intersection point of down touch line generated from index finger contour.
+
+### Calculate movements
+
+#### X
+
 
 
 ## Reference
