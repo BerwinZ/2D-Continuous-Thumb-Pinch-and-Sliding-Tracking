@@ -21,6 +21,7 @@ from segment_otsu import threshold_masking
 from segment_edge import sobel_filters
 from tracking_convdef import get_defect_points
 from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_points
+from tracking_OFLK import optical_flow_LK
 from move_tracker import correct_tracker
 from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
 from math_tools import points_distance
@@ -302,6 +303,50 @@ def get_circle(p1, p2, p3):
 
     return center
 
+def configure_track_points(IM_WIDTH, IM_HEIGHT):
+    """Configure the grid point of the image
+    
+    Arguments:
+        IM_WIDTH {[type]} -- [description]
+        IM_HEIGHT {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    step = 50
+    X, Y = np.mgrid[0:IM_WIDTH:step, 0:IM_HEIGHT:step]
+    all_points = np.vstack((X.ravel(), Y.ravel())).T
+    all_points = list(map(tuple, all_points))
+    return all_points
+
+def get_track_points(contour, all_points):
+    """Get the grid points inside the contour
+    
+    Arguments:
+        contour {[type]} -- [description]
+        all_points {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if contour is None or IM_WIDTH is None or IM_HEIGHT is None:
+        return None
+    
+    # f = lambda p: cv2.pointPolygonTest(contour, p, True)
+    # flag = np.array(list(map(f, all_points)))
+    # track_points = np.float32(all_points)[flag > 0]
+
+    track_points = []
+    for p in all_points:
+        if cv2.pointPolygonTest(contour, p, True) > 0:
+            track_points.append(p)
+    track_points = np.float32(track_points)
+
+    if track_points.size == 0:
+        return None
+    else:
+        return track_points
+
 
 if __name__ == '__main__':
     """
@@ -315,6 +360,10 @@ if __name__ == '__main__':
                                                                FRAME_RATE=40)
         # Show image
         SHOW_IMAGE = True
+
+        # Optical FLow calculator
+        grid_points = configure_track_points(IM_WIDTH, IM_HEIGHT)
+        opt_flow = optical_flow_LK()
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         tracker = correct_tracker()
@@ -401,8 +450,12 @@ if __name__ == '__main__':
                                           image_for_grad=None)
             
             # ---------------------------------------------
-            # 1.7 Get some parameters 
+            # 1.7 Calculate optical flow
             # ---------------------------------------------
+            gray_img = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
+            track_points = get_track_points(down_contour, grid_points)
+            direc = opt_flow.calc_optical_flow(gray_img, track_points, bgr_image)
+
             # touch_angle = None
             # if defect_points is not None:
             #     center = get_circle(defect_points[0], defect_points[1], touch_point)
@@ -421,6 +474,9 @@ if __name__ == '__main__':
             # Draw centroid points (Pink)
             draw_points(finger_image, up_centroid, color=[255, 0, 0])
             draw_points(finger_image, down_centroid, color=[255, 0, 0])
+            # Draw tracked points
+            draw_points(bgr_image, track_points, color=[255, 0, 0])
+
 
             # ---------------------------------------------
             # 1.9 Show image
