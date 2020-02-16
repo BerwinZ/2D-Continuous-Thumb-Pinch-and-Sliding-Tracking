@@ -4,10 +4,10 @@ This script is used to track the touch position with amendment
 It includes:
 1. Call Otsu threshold to finger_image the hand part and get the contour of hand
 2. Get 2 Convexity Defects with largest distance from the contour
-3. Calculate the middle point of convexity defects, find the touch point and use Kalman filter to correct it
-4. Segment the contour to up and bottom finger contour
-5. Use point tracker to calculate movements with amendment
-6. Draw movements in drawing board
+3. Segment the contour to up and bottom finger contour
+4. Fit the curve of up and bottom finger touch line
+5. Find the touch point
+6. Use optical flow to detect the movements of finger
 '''
 
 import cv2
@@ -24,10 +24,18 @@ from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_point
 from tracking_OFLK import optical_flow_LK
 from move_tracker import correct_tracker
 from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
-from math_tools import points_distance
+from math_tools import points_distance, my_arctan_degrees, get_circle
 
 
 def get_centroid(contour):
+    """Get the centroid of the contour
+    
+    Arguments:
+        contour {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
     if contour is None:
         return None, None
 
@@ -149,7 +157,7 @@ def fit_lost_contour(IS_UP,
 
         points = points.astype("int")
         draw_points(draw_image, points, radius=3, color=color)
-       
+
     return curve, theta
 
 
@@ -266,7 +274,7 @@ def __get_min_grad(gray_img, defect_points, start_point):
     else:
         k = -(x2 - x1) / (y2 - y1)
         line = lambda x: k * (x - defect_middle[0]) + defect_middle[1]
-        
+
         dx = (int)(abs(ck_d / 2 * np.cos(np.arctan(k))))
         min_x = max(0, start_point[0] - dx)
         max_x = min(width - 1, start_point[0] + dx)
@@ -274,7 +282,7 @@ def __get_min_grad(gray_img, defect_points, start_point):
         Y = line(X).astype("int")
         X = X[(Y >= 0) & (Y < height)]
         Y = Y[(Y >= 0) & (Y < height)]
-    
+
     if X.size > 0:
         index = np.where(G[Y, X] == max(G[Y, X]))[0][0]
         return (X[index], Y[index])
@@ -282,72 +290,7 @@ def __get_min_grad(gray_img, defect_points, start_point):
         return start_point
 
 
-
-def get_circle(p1, p2, p3):
-    if p1 is None or p2 is None or p3 is None:
-        return None
-
-    a = 2*(p2[0]-p1[0])
-    b = 2*(p2[1]-p1[1])
-    c = p2[0]*p2[0]+p2[1]*p2[1]-p1[0]*p1[0]-p1[1]*p1[1]
-    d = 2*(p3[0]-p2[0])
-    e = 2*(p3[1]-p2[1])
-    f = p3[0]*p3[0]+p3[1]*p3[1]-p2[0]*p2[0]-p2[1]*p2[1]
-    if b*d-e*a == 0:
-        return None
-
-    x = (b*f-e*c)/(b*d-e*a)
-    y = (d*c-a*f)/(b*d-e*a)
-
-    center = ((int)(x), (int)(y))
-
-    return center
-
-def configure_track_points(IM_WIDTH, IM_HEIGHT):
-    """Configure the grid point of the image
     
-    Arguments:
-        IM_WIDTH {[type]} -- [description]
-        IM_HEIGHT {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
-    """
-    step = 50
-    X, Y = np.mgrid[0:IM_WIDTH:step, 0:IM_HEIGHT:step]
-    all_points = np.vstack((X.ravel(), Y.ravel())).T
-    all_points = list(map(tuple, all_points))
-    return all_points
-
-def get_track_points(contour, all_points):
-    """Get the grid points inside the contour
-    
-    Arguments:
-        contour {[type]} -- [description]
-        all_points {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
-    """
-    if contour is None or IM_WIDTH is None or IM_HEIGHT is None:
-        return None
-    
-    # f = lambda p: cv2.pointPolygonTest(contour, p, True)
-    # flag = np.array(list(map(f, all_points)))
-    # track_points = np.float32(all_points)[flag > 0]
-
-    track_points = []
-    for p in all_points:
-        if cv2.pointPolygonTest(contour, p, True) > 0:
-            track_points.append(p)
-    track_points = np.float32(track_points)
-
-    if track_points.size == 0:
-        return None
-    else:
-        return track_points
-
-
 if __name__ == '__main__':
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
@@ -362,8 +305,7 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Optical FLow calculator
-        grid_points = configure_track_points(IM_WIDTH, IM_HEIGHT)
-        opt_flow = optical_flow_LK()
+        opt_flow = optical_flow_LK(IM_WIDTH, IM_HEIGHT)
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         tracker = correct_tracker()
@@ -439,7 +381,7 @@ if __name__ == '__main__':
             down_centroid = get_centroid(down_contour)
 
             # ---------------------------------------------
-            # 1.6 Get touch point 
+            # 1.6 Get touch point
             # ---------------------------------------------
             touch_point = get_touch_point(defect_points=defect_points,
                                           up_centroid=up_centroid,
@@ -448,13 +390,41 @@ if __name__ == '__main__':
                                           down_touch_line=down_touch_line,
                                           theta=theta,
                                           image_for_grad=None)
-            
+
             # ---------------------------------------------
             # 1.7 Calculate optical flow
             # ---------------------------------------------
             gray_img = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
-            track_points = get_track_points(down_contour, grid_points)
-            direc = opt_flow.calc_optical_flow(gray_img, track_points, bgr_image)
+            direc = opt_flow.calc_contour(gray_img,
+                                          down_contour,
+                                          draw_img=None)
+            if direc is not None:
+                # angle = map(my_arctan_degrees, direc[:, 1], direc[:, 0])
+                # angle = np.fromiter(angle, np.float)
+
+                # vector = np.array([1, np.tan(np.radians(angle.mean()))])
+                # if angle.mean() > 90 or angle.mean() < -90:
+                #     vector = -vector
+
+                # mov_dis = np.linalg.norm(direc, axis=1)
+                # vector = vector / np.linalg.norm(vector) * mov_dis.mean()
+                # print(angle.mean(), angle.var())
+                # print(mov_dis.mean(), mov_dis.var())
+
+                vector = sum(direc)
+                # vector = vector / direc.shape[0]
+
+                mov_dis = np.linalg.norm(vector)
+
+                if mov_dis > 30:
+                    p = ((int)(320 + vector[0]), (int)(240 + vector[1]))
+                    cv2.line(bgr_image, (320, 240),
+                            p,
+                            color=[255, 0, 0],
+                            thickness=5)       
+
+                    print(my_arctan_degrees(*vector), mov_dis)
+              
 
             # touch_angle = None
             # if defect_points is not None:
@@ -467,23 +437,17 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 1.8 Draw elements
             # ---------------------------------------------
-            # Two defect points (Green)
+            # Two defect points (Green), touch point (Red), centroid points (Pink)
             draw_points(finger_image, defect_points, color=[0, 255, 0])
-            # Raw touch point (Red)
             draw_points(finger_image, touch_point, color=[255, 255, 255])
-            # Draw centroid points (Pink)
             draw_points(finger_image, up_centroid, color=[255, 0, 0])
             draw_points(finger_image, down_centroid, color=[255, 0, 0])
-            # Draw tracked points
-            draw_points(bgr_image, track_points, color=[255, 0, 0])
-
 
             # ---------------------------------------------
             # 1.9 Show image
             # ---------------------------------------------
             if SHOW_IMAGE:
-                image_joint = np.concatenate(
-                    (bgr_image, finger_image), axis=1)
+                image_joint = np.concatenate((bgr_image, finger_image), axis=1)
                 draw_vertical_lines(image_joint, 1)
                 cv2.imshow('Finger', image_joint)
 
@@ -494,7 +458,8 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2.1 Use tracker to calculate the movements
             # ---------------------------------------------
-            dx, dy = tracker.calc_scaled_move(up_touch_line, up_centroid, touch_point)
+            dx, dy = tracker.calc_scaled_move(up_touch_line, up_centroid,
+                                              touch_point)
 
             # ---------------------------------------------
             # 2.2 Show parameters
@@ -539,7 +504,8 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(up_touch_line, up_centroid, touch_point)
+                tracker.calibrate_touch_point(up_touch_line, up_centroid,
+                                              touch_point)
                 hv_board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
