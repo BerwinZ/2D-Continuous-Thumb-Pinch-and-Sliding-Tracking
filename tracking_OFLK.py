@@ -61,6 +61,7 @@ class optical_flow_LK:
                 x1, y1 = new.ravel()
                 x0, y0 = old.ravel()
 
+                cv2.circle(draw_img, (x0, y0), 5, [255, 0, 0])
                 cv2.line(draw_img, (x0, y0), (x1, y1), [0, 255, 0], 3)
 
         return direc
@@ -82,15 +83,16 @@ class optical_flow_LK:
             print("Haven't configured the grid points")
             return None
 
-        # f = lambda p: cv2.pointPolygonTest(contour, p, True)
-        # flag = np.array(list(map(f, all_points)))
-        # track_points = np.float32(all_points)[flag > 0]
+        f = lambda p: cv2.pointPolygonTest(contour, p, True)
+        flag = map(f, self._grid_points)
+        flag = np.fromiter(flag, dtype=np.float)
+        track_points = np.float32(self._grid_points)[flag > 0]
 
-        track_points = []
-        for p in self._grid_points:
-            if cv2.pointPolygonTest(contour, p, True) > 0:
-                track_points.append(p)
-        track_points = np.float32(track_points)
+        # track_points = []
+        # for p in self._grid_points:
+        #     if cv2.pointPolygonTest(contour, p, True) > 0:
+        #         track_points.append(p)
+        # track_points = np.float32(track_points)
 
         return self.calc_points(new_gray, track_points, draw_img)
 

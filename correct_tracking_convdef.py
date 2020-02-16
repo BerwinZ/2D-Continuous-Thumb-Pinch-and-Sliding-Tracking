@@ -290,7 +290,26 @@ def __get_min_grad(gray_img, defect_points, start_point):
         return start_point
 
 
-    
+def calc_whole_finger_mov(up_direcs, down_direcs):
+    if up_direcs is None or down_direcs is None:
+        return None
+
+    vector_up = sum(up_direcs)
+    vector_down = sum(down_direcs)
+
+    # Normalization (?)
+
+    norm_up = np.linalg.norm(vector_up)
+    norm_down = np.linalg.norm(vector_down)
+
+    if norm_up > 15 and norm_down > 30:
+        print('Angle', (int)(my_arctan_degrees(*vector_up)), 'Dis', (int)(norm_up))
+        print('Angle', (int)(my_arctan_degrees(*vector_down)), 'Dis', (int)(norm_down))
+        print('-' * 60)
+
+    return None
+
+
 if __name__ == '__main__':
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
@@ -305,7 +324,8 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Optical FLow calculator
-        opt_flow = optical_flow_LK(IM_WIDTH, IM_HEIGHT)
+        opt_flow_up = optical_flow_LK(IM_WIDTH, IM_HEIGHT, step=50)
+        opt_flow_down = optical_flow_LK(IM_WIDTH, IM_HEIGHT, step=50)
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         tracker = correct_tracker()
@@ -395,42 +415,16 @@ if __name__ == '__main__':
             # 1.7 Calculate optical flow
             # ---------------------------------------------
             gray_img = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
-            direc = opt_flow.calc_contour(gray_img,
-                                          down_contour,
-                                          draw_img=None)
-            if direc is not None:
-                # angle = map(my_arctan_degrees, direc[:, 1], direc[:, 0])
-                # angle = np.fromiter(angle, np.float)
 
-                # vector = np.array([1, np.tan(np.radians(angle.mean()))])
-                # if angle.mean() > 90 or angle.mean() < -90:
-                #     vector = -vector
+            up_direcs = opt_flow_up.calc_contour(gray_img,
+                                                 up_contour,
+                                                 draw_img=None)
 
-                # mov_dis = np.linalg.norm(direc, axis=1)
-                # vector = vector / np.linalg.norm(vector) * mov_dis.mean()
-                # print(angle.mean(), angle.var())
-                # print(mov_dis.mean(), mov_dis.var())
+            down_direcs = opt_flow_down.calc_contour(gray_img,
+                                                     down_contour,
+                                                     draw_img=None)
 
-                vector = sum(direc)
-                # vector = vector / direc.shape[0]
-
-                mov_dis = np.linalg.norm(vector)
-
-                if mov_dis > 30:
-                    p = ((int)(320 + vector[0]), (int)(240 + vector[1]))
-                    cv2.line(bgr_image, (320, 240),
-                            p,
-                            color=[255, 0, 0],
-                            thickness=5)       
-
-                    print(my_arctan_degrees(*vector), mov_dis)
-              
-
-            # touch_angle = None
-            # if defect_points is not None:
-            #     center = get_circle(defect_points[0], defect_points[1], touch_point)
-            #     # draw_points(finger_image, center, color=[255, 0, 255])
-            #     touch_angle = calc_touch_angle(center, touch_point)
+            calc_whole_finger_mov(up_direcs, down_direcs)
 
             # real_x = tracker.coor_to_real_len(up_touch_line, up_centroid, touch_point)
 
