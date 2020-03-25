@@ -9,18 +9,6 @@ It includes:
 5. Draw the relative movements in a drawing board
 '''
 
-import cv2
-import numpy as np
-from time import sleep
-import sys
-import traceback
-import picamera_control
-from draw_tools import draw_board, draw_vertical_lines, draw_points
-from math_tools import points_distance
-from segment_otsu import threshold_masking
-from move_tracker import touch_trakcer
-
-
 def configure_kalman_filter():
     """Configure the kalman filter
 
@@ -195,7 +183,19 @@ def get_touch_point(defect_points,
     return touch_point, filter_touch_point
 
 
+import cv2
+import numpy as np
+from time import sleep
+import sys
+import traceback
+
 if __name__ == '__main__':
+    import picamera_control
+    from draw_tools import draw_board, draw_vertical_lines, draw_points
+    from math_tools import points_distance
+    from segment_otsu import threshold_masking
+    from move_tracker import touch_trakcer
+
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
     """

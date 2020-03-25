@@ -7,13 +7,6 @@ It includes:
 3. Draw the movements in a drawing board
 '''
 
-import cv2
-import numpy as np
-from time import sleep
-import picamera_control
-import sys, traceback
-from draw_tools import draw_vertical_lines
-
 
 def threshold_masking(img):
     """Get the mask for the img
@@ -72,7 +65,15 @@ def threshold_masking(img):
     return mask, max_contour
 
 
+import cv2
+import numpy as np
+
 if __name__ == '__main__':
+    from time import sleep
+    import picamera_control
+    import sys, traceback
+    from draw_tools import draw_vertical_lines
+    
     """
     This function get the frame from the camera, and use thresholding to segment the hand part
     """

@@ -1,6 +1,6 @@
 # MicroPinch
 
-This repo is used to track the thumb's touch position relatived to other fintertips. It runs in Raspberry Pi with a Pi Camera.
+This repo is used to track the thumb's touch position relative to other fingertips. It runs in Raspberry Pi with a Pi Camera Module.
 
 ## Requirements
 
@@ -9,7 +9,23 @@ This repo is used to track the thumb's touch position relatived to other fintert
 * Python 3.7.6
 * OpenCV-Python 3.4.2.16
 
-## Content
+## How to set up
+
+1. Clone or download this repo to Raspberry Pi
+2. Install Python 3.7.6 in Raspberry Pi
+3. Install the required packages by
+    ```Bash
+    pip install -r requirements.txt
+    ```
+4. Run the scripts
+
+## Raspberry Pi Folder
+
+pi@192.168.137.209:/home/pi/mcrpnh
+
+## Scripts Analysis
+
+### Scripts Description
 
 | Script   | Content   |
 |---|---|
@@ -21,42 +37,9 @@ This repo is used to track the thumb's touch position relatived to other fintert
 | move_tracker.py | transferred the movements of tracked feature points to the movements of finger's real movements |
 | draw_tools.py | draw points in a board to indicate the movements, and some useful drawing functions |
 
-## Raspberry Pi Folder
+### Pipeline
 
-pi@192.168.137.209:/home/pi/mcrpnh
-
-## Steps
-
-### Find the touch line between two fingers
-
-#### Fit a curve using the contour points
-
-Up contour can work with a 4 ladder poly, but Down contour cannot because it is not a function.
-
-#### Rotate the down contour points, then rotate the fitted curve back
-
-Work only when the thumb move up.
-
-#### Fit a ellipse for the down contour
-
-Cannot work, shape is not fitted and cannot find the intersection between the ellipse with the line
-
-#### Detect the touch line with the Canny algorithm
-
-Cannot work because it is very hard to detect
-
-#### Fit a curve, then find the nearest points, then fit again
-
-May work
-
-### Decide the touch point
-
-When thumb is up, use the intersection point of up touch line generated from thumb contour. When the thumb is down, use the intersection point of down touch line generated from index finger contour.
-
-### Calculate movements
-
-#### X
-
+TBD
 
 
 ## Reference

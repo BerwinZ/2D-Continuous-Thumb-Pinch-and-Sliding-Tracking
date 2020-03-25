@@ -10,18 +10,6 @@ It includes:
 6. Draw the relative movements in a drawing board
 '''
 
-import cv2
-import numpy as np
-from time import sleep
-import sys
-import traceback
-import picamera_control
-from draw_tools import draw_vertical_lines, draw_points, draw_board
-from segment_otsu import threshold_masking
-from move_tracker import bound_trakcer
-from tracking_convdef import get_defect_points, get_min_gray
-
-
 def get_touch_line(finger_img, defect_points, line_points_num=10):
 
     if defect_points is None:
@@ -71,6 +59,7 @@ def segment_diff_fingers(contour, defect_points):
 
     (x1, y1), (x2, y2) = defect_points
 
+    # TODO: some error here, 179938 image in step=2 dataset
     if abs(x2 - x1) < 1e-6:
         up_finger = contour[contour[:, 0, 0] <= x1]
         down_finger = contour[contour[:, 0, 0] >= x1]
@@ -117,7 +106,7 @@ def add_touch_line(is_up, contour, defect_points, touch_line):
 
     return contour
 
-
+# TODO: some error here, 179938 image in step=2 dataset
 def get_bound_points(up_contour, down_contour, height, width):
     """Get the four boundary points of the hand contour
     
@@ -193,7 +182,19 @@ def get_bound_points(up_contour, down_contour, height, width):
     return top_left, top_right, bottom_left, bottom_right
 
 
+import cv2
+import numpy as np
+from time import sleep
+import sys
+import traceback
+
 if __name__ == '__main__':
+    import picamera_control
+    from draw_tools import draw_vertical_lines, draw_points, draw_board
+    from segment_otsu import threshold_masking
+    from move_tracker import bound_trakcer
+    from tracking_convdef import get_defect_points, get_min_gray
+
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
     """

@@ -143,3 +143,5 @@ python_samples/
 images/
 images_crop/
 Backup/
+GeneratedDataset/
+ProcessedData/

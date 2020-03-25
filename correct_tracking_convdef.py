@@ -10,23 +10,6 @@ It includes:
 6. Use optical flow to detect the movements of finger
 '''
 
-import cv2
-import numpy as np
-from time import sleep
-import sys
-import traceback
-from scipy.optimize import fsolve, curve_fit
-import picamera_control
-from segment_otsu import threshold_masking
-from segment_edge import sobel_filters
-from tracking_convdef import get_defect_points
-from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_points
-from tracking_OFLK import optical_flow_LK
-from move_tracker import correct_tracker
-from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
-from math_tools import points_distance, my_arctan_degrees, get_circle
-
-
 def get_centroid(contour):
     """Get the centroid of the contour
     
@@ -134,6 +117,9 @@ def fit_lost_contour(IS_UP,
     # Fit the function
     X = contour[:, 0]
     Y = contour[:, 1]
+    if len(X) == 0 or len(Y) == 0:
+        return None, None
+    
     curve = fitting_curve(X, Y)
 
     if draw_image is not None:
@@ -310,7 +296,25 @@ def calc_whole_finger_mov(up_direcs, down_direcs):
     return None
 
 
+import cv2
+import numpy as np
+from time import sleep
+import sys
+import traceback
+
+
 if __name__ == '__main__':
+    from scipy.optimize import fsolve, curve_fit
+    import picamera_control
+    from segment_otsu import threshold_masking
+    from segment_edge import sobel_filters
+    from tracking_convdef import get_defect_points
+    from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_points
+    from tracking_OFLK import optical_flow_LK
+    from move_tracker import correct_tracker
+    from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
+    from math_tools import points_distance, my_arctan_degrees, get_circle
+
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
     """
