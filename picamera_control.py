@@ -2,8 +2,10 @@
 This script is used to set up the Pi Camera.
 
 It includes:
-1. Configure the Pi Camera and get the reference for the raw data
-2. Show the live video stream of the camera
+1. configure_camera
+    Configure the Pi Camera and get the reference for the raw data
+2. live_video
+    Show the live video stream of the camera
 '''
 
 import cv2
@@ -11,8 +13,6 @@ import numpy as np
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from time import sleep
-import sys, traceback
-
 
 def configure_camera(IM_LENGTH=480, IM_WIDTH=480, FRAME_RATE=25):
     """Set up camera resolution, framerate and get the reference for raw data
@@ -69,6 +69,8 @@ if __name__ == "__main__":
     """
     Get the rawcapture of pi camera and show the live video
     """
+    import sys, traceback
+
     try:
         camera, rawCapture = configure_camera(640, 480)
         live_video(camera, rawCapture)

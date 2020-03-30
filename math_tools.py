@@ -1,5 +1,23 @@
-import numpy as np
+"""
+Calculation collections
+1. points_distance
+    Get distance between two tuple points
+2. Scaler
+    Normalized the data into a new range
+3. my_arctan_degrees
+    Get the angle of the slope of (x, y)
+4. get_circle
+    Calculate a circle from 3 points
+5. configure_kalman_filter
+    Configure a kalman filter
+6. get_min_gray_point
+    Get the min points from the slope line within a distance to start_pos
+7. calc_touch_angle
+    Calculate the degree angle from base to target
+"""
 
+import numpy as np
+import cv2
 
 def points_distance(point1, point2):
     """Return the distance between point 1 and point2
@@ -96,3 +114,114 @@ def get_circle(p1, p2, p3):
     center = ((int)(x), (int)(y))
 
     return center
+
+def configure_kalman_filter():
+    """Configure the kalman filter
+
+    Returns:
+        kalman_filter [cv2.KalmanFilter]
+    """
+    # State number: 4, including (x，y，dx，dy) (position and velocity)
+    # Measurement number: 2, (x, y) (position)
+    kalman = cv2.KalmanFilter(4, 2)
+    kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]],
+                                        np.float32)
+    kalman.transitionMatrix = np.array(
+        [[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+    kalman.processNoiseCov = np.array(
+        [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+        np.float32) * 0.03
+
+    return kalman
+
+def get_min_gray_point(gray_img, start_pos, distance=0, slope=None):
+    """Get the min gray in the slope direction and within the distance
+
+    Arguments:
+        gray_img {[type]} -- [description]
+        start_pos {[type]} -- [description]
+
+    Keyword Arguments:
+        distance {int} -- [description] (default: {0})
+        vertical {bool} -- [description] (default: {True})
+        slope {int} -- [description] (default: {0})
+
+    Returns:
+        point_max_gradient {tuple} -- [description]
+    """
+    # x is from left to right, related to width
+    # y is from up to down, related to height
+    x, y = start_pos
+    min_gray = float('inf')
+    min_x, min_y = 0, 0
+    height, width = gray_img.shape[0], gray_img.shape[1]
+
+    def __IsValid(x, y):
+        """Check whether x and y is in the boundary of img
+        """
+        return 0 <= x < width and 0 <= y < height
+
+    if slope is None:
+        # Let column(x) to be fixed and change the row(y)
+        for dy in range(int(-distance / 2), int(distance / 2)):
+            if __IsValid(x, y + dy) and gray_img[y + dy, x] < min_gray:
+                min_gray = gray_img[y + dy, x]
+                min_x, min_y = x, y + dy
+    else:
+        c_x, c_y = x, y
+        # up
+        while __IsValid(c_x, c_y) and points_distance((c_x, c_y),
+                                                      (x, y)) < distance / 2:
+            if gray_img[c_y, c_x] < min_gray:
+                min_gray = gray_img[c_y, c_x]
+                min_x, min_y = c_x, c_y
+            c_x = c_x + 1
+            c_y = int(c_y + 1 * slope)
+
+        c_x, c_y = x, y
+        # down
+        while __IsValid(c_x, c_y) and points_distance((c_x, c_y),
+                                                      (x, y)) < distance / 2:
+            if gray_img[c_y, c_x] < min_gray:
+                min_gray = gray_img[c_y, c_x]
+                min_x, min_y = c_x, c_y
+            c_x = c_x - 1
+            c_y = int(c_y - 1 * slope)
+
+    # Check the ans
+    if min_gray == float('inf'):
+        return start_pos
+    else:
+        return (min_x, min_y)
+
+def calc_touch_angle(base, target):
+    """Calculate the degree angle from base to target
+    
+    Arguments:
+        base {[type]} -- [description]
+        target {[type]} -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
+    if base is None or target is None:
+        return None
+
+    x1, y1 = base
+    x2, y2 = target
+    if x1 is None or y1 is None or x2 is None or y2 is None:
+        return None
+
+    if abs(x1 - x2) < 1e-9:
+        if y2 > y1:
+            return 90
+        else:
+            return -90
+    else:
+        slope = (y1 - y2) / (x1 - x2)
+        angle = np.degrees(np.arctan(slope))
+        if y2 > y1 and angle < 0:
+            angle = 180 + angle
+
+        return angle
+

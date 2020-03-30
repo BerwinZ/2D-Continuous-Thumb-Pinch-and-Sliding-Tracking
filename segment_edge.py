@@ -5,19 +5,6 @@ It includes:
 
 '''
 
-import cv2
-import numpy as np
-from time import sleep
-import picamera_control
-import sys, traceback
-from draw_tools import draw_vertical_lines
-from segment_otsu import threshold_masking
-from tracking_convdef import get_defect_points
-from draw_tools import draw_points
-from scipy import ndimage
-
-
-
 def edge_masking(img):
     pass
 
@@ -71,6 +58,17 @@ def non_max_suppression(img, D):
 
     return Z
 
+import cv2
+import numpy as np
+from time import sleep
+import picamera_control
+import sys, traceback
+from draw_tools import draw_vertical_lines
+from segment_otsu import threshold_masking
+from tracking_defect import get_defect_points
+from draw_tools import draw_points
+from scipy import ndimage
+
 
 if __name__ == '__main__':
     """
@@ -94,7 +92,7 @@ if __name__ == '__main__':
             finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
             defect_points, _ = get_defect_points(contour,
-                                                 MIN_CHECK_AREA=100000,
+                                                 MIN_VALID_CONT_AREA=100000,
                                                  MIN_DEFECT_DISTANCE=5000)
 
             draw_points(bgr_image, defect_points)

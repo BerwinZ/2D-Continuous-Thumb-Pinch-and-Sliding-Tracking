@@ -1,151 +1,9 @@
-'''
-This script is used to track the touch position with amendment
-
-It includes:
-1. Call Otsu threshold to finger_image the hand part and get the contour of hand
-2. Get 2 Convexity Defects with largest distance from the contour
-3. Segment the contour to up and bottom finger contour
-4. Fit the curve of up and bottom finger touch line
-5. Find the touch point
-6. Use optical flow to detect the movements of finger
-'''
-
-def get_centroid(contour):
-    """Get the centroid of the contour
-    
-    Arguments:
-        contour {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
-    """
-    if contour is None:
-        return None, None
-
-    moment = cv2.moments(contour)
-    if moment['m00'] != 0:
-        cx = int(moment['m10'] / moment['m00'])
-        cy = int(moment['m01'] / moment['m00'])
-        return cx, cy
-    else:
-        return None, None
-
-
-def calc_touch_angle(base, target):
-    """Calculate the degree angle from base to target
-    
-    Arguments:
-        base {[type]} -- [description]
-        target {[type]} -- [description]
-    
-    Returns:
-        [type] -- [description]
-    """
-    if base is None or target is None:
-        return None
-
-    x1, y1 = base
-    x2, y2 = target
-    if x1 is None or y1 is None or x2 is None or y2 is None:
-        return None
-
-    if abs(x1 - x2) < 1e-9:
-        if y2 > y1:
-            return 90
-        else:
-            return -90
-    else:
-        slope = (y1 - y2) / (x1 - x2)
-        angle = np.degrees(np.arctan(slope))
-        if y2 > y1 and angle < 0:
-            angle = 180 + angle
-
-        return angle
-
-
-def fit_lost_contour(IS_UP,
-                     contour,
-                     bound_points,
-                     fitting_curve,
-                     defect_points,
-                     draw_image=None):
-    """Fit the up contour with polyfit using the points of the contour within the bound points
-    
-    Arguments:
-        IS_UP {bool} -- [description]
-        contour {[type]} -- [description]
-        bound_points {[type]} -- [description]
-        fitting_curve {[type]} -- [description]
-        defect_points {[type]} -- [description]
-    
-    Keyword Arguments:
-        draw_image {[type]} -- [description] (default: {None})
-    
-    Returns:
-        curve [lambda function]
-        theta [float]
-    """
-    if contour is None or fitting_curve is None or defect_points is None:
-        return None, None
-
-    # Get the points used to fit
-    if bound_points is None or bound_points[0] is None or bound_points[
-            1] is None:
-        return None, None
-
-    (x1, y1), (x2, y2) = bound_points
-    contour = np.reshape(contour, (contour.shape[0], 2))
-    theta = None
-
-    if IS_UP:
-        f = lambda x, y: (y2 - y1) / (x2 - x1) * (x - x1) - (y - y1)
-        contour = contour[f(contour[:, 0], contour[:, 1]) < 0]
-    else:
-        # Rotate points
-        if abs(x1 - x2) < 1e-9:
-            theta = -1 * 90 * np.pi / 180
-            contour = contour[contour[:, 0] > 0]
-        else:
-            theta = -1 * np.arctan((y2 - y1) / (x2 - x1))
-            f = lambda x, y: (y2 - y1) / (x2 - x1) * (x - x1) - (y - y1)
-            contour = contour[f(contour[:, 0], contour[:, 1]) > 0]
-
-        rotate = __rotate_array(theta)
-        contour = rotate.dot(contour.T).T
-        defect_points = rotate.dot(np.array(defect_points).T).T
-
-    # Fit the function
-    X = contour[:, 0]
-    Y = contour[:, 1]
-    if len(X) == 0 or len(Y) == 0:
-        return None, None
-    
-    curve = fitting_curve(X, Y)
-
-    if draw_image is not None:
-        # Draw the points used to fit
-        color = [0, 0, 255] if IS_UP else [255, 0, 0]
-        draw_points(draw_image, contour.astype("int"), radius=3, color=color)
-
-        # Get the touch line x range
-        p_x = np.arange(defect_points[0][0], defect_points[1][0])
-        p_y = np.array(curve(p_x))
-        # Reshape
-        num = p_x.shape[0]
-        p_x = np.reshape(p_x, (num, 1))
-        p_y = np.reshape(p_y, (num, 1))
-        # Joint
-        points = np.concatenate((p_x, p_y), axis=1)
-
-        if not IS_UP:
-            rotate = __rotate_array(-theta)
-            points = rotate.dot(points.T).T
-
-        points = points.astype("int")
-        draw_points(draw_image, points, radius=3, color=color)
-
-    return curve, theta
-
+"""
+1. get_touch_point
+    Get touch point in the touch line curve
+2. show_whole_finger_motion
+    Show the motion for the whole finger
+"""
 
 def __get_intersection(curve, defect_points, theta=None):
     """Get intersection point between the vertical bisector and the curve
@@ -276,7 +134,7 @@ def __get_min_grad(gray_img, defect_points, start_point):
         return start_point
 
 
-def calc_whole_finger_mov(up_direcs, down_direcs):
+def show_whole_finger_motion(up_direcs, down_direcs):
     if up_direcs is None or down_direcs is None:
         return None
 
@@ -298,22 +156,30 @@ def calc_whole_finger_mov(up_direcs, down_direcs):
 
 import cv2
 import numpy as np
-from time import sleep
-import sys
-import traceback
-
+from scipy.optimize import fsolve, curve_fit
 
 if __name__ == '__main__':
-    from scipy.optimize import fsolve, curve_fit
+    '''
+    This script is used to track the touch position based on geometry features
+
+    It includes:
+    1. Call Otsu threshold to finger_image the hand part and get the contour of hand
+    2. Get 2 Convexity Defects with largest distance from the contour
+    3. Segment the contour to up and bottom finger contour
+    4. Fit the curve of up and bottom finger touch line
+    5. Find the touch point
+    6. Use optical flow to detect the movements of finger
+    '''
+    from time import sleep
+    import sys, traceback
     import picamera_control
     from segment_otsu import threshold_masking
     from segment_edge import sobel_filters
-    from tracking_convdef import get_defect_points
-    from tracking_bound import segment_diff_fingers, add_touch_line, get_bound_points
-    from tracking_OFLK import optical_flow_LK
-    from move_tracker import correct_tracker
-    from draw_tools import draw_board, draw_vertical_lines, draw_points, draw_contours
+    from contour_tools import get_defect_points, segment_diff_fingers, add_touch_line_to_contour, get_boundary_points, get_centroid, get_touch_line_curve
     from math_tools import points_distance, my_arctan_degrees, get_circle
+    from draw_tools import DrawBoard, draw_vertical_lines, draw_points, draw_contours
+    from opt_flow_LK import OpticalFlowLK
+    from coord_calculator import GeometryCalculator
 
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part
@@ -328,18 +194,18 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Optical FLow calculator
-        opt_flow_up = optical_flow_LK(IM_WIDTH, IM_HEIGHT, step=50)
-        opt_flow_down = optical_flow_LK(IM_WIDTH, IM_HEIGHT, step=50)
+        opt_flow_up = OpticalFlowLK(IM_WIDTH, IM_HEIGHT, step=50)
+        opt_flow_down = OpticalFlowLK(IM_WIDTH, IM_HEIGHT, step=50)
 
         # Tracker to convert point movement in image coordinate to the draw board coordinate
-        tracker = correct_tracker()
+        tracker = GeometryCalculator()
 
         # Drawing boards
         DRAW_SCALER = 50
         DR_WIDTH, DR_HEIGHT = 320, 320
-        hv_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
-        hor_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
-        ver_board = draw_board(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        hv_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
+        hor_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        ver_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
 
         print('-' * 60)
         print(
@@ -367,7 +233,7 @@ if __name__ == '__main__':
             # 1.2 Get defect points
             # ---------------------------------------------
             defect_points, _ = get_defect_points(contour,
-                                                 MIN_CHECK_AREA=100000,
+                                                 MIN_VALID_CONT_AREA=100000,
                                                  MIN_DEFECT_DISTANCE=5000)
 
             # ---------------------------------------------
@@ -379,10 +245,10 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 1.4 Get touch lines
             # ---------------------------------------------
-            top_left, top_right, bottom_left, bottom_right = get_bound_points(
+            top_left, top_right, bottom_left, bottom_right = get_boundary_points(
                 up_contour, down_contour, IM_HEIGHT, IM_WIDTH)
 
-            up_touch_line, _ = fit_lost_contour(
+            up_touch_line, _ = get_touch_line_curve(
                 IS_UP=True,
                 contour=up_contour,
                 bound_points=(top_left, top_right),
@@ -390,7 +256,7 @@ if __name__ == '__main__':
                 defect_points=defect_points,
                 draw_image=None)
 
-            down_touch_line, theta = fit_lost_contour(
+            down_touch_line, theta = get_touch_line_curve(
                 IS_UP=False,
                 contour=down_contour,
                 bound_points=(bottom_left, bottom_right),
@@ -428,7 +294,7 @@ if __name__ == '__main__':
                                                      down_contour,
                                                      draw_img=None)
 
-            calc_whole_finger_mov(up_direcs, down_direcs)
+            show_whole_finger_motion(up_direcs, down_direcs)
 
             # real_x = tracker.coor_to_real_len(up_touch_line, up_centroid, touch_point)
 
@@ -456,7 +322,7 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2.1 Use tracker to calculate the movements
             # ---------------------------------------------
-            dx, dy = tracker.calc_scaled_move(up_touch_line, up_centroid,
+            dx, dy = tracker.calc_coord(up_touch_line, up_centroid,
                                               touch_point)
 
             # ---------------------------------------------
@@ -502,7 +368,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                tracker.calibrate_touch_point(up_touch_line, up_centroid,
+                tracker.calibrate_touch_scale(up_touch_line, up_centroid,
                                               touch_point)
                 hv_board.reset_board()
                 hor_board.reset_board()

@@ -32,9 +32,9 @@ pi@192.168.137.209:/home/pi/mcrpnh
 | picamera_control.py | configure the pi camera and get raw image data (BGR) |
 | segment_hbp.py | segment the hand part from the image with histogram backprojection method |
 | segment_otsu.py | segment the hand part from the image with otsu thresholding method |
-| tracking_convdef.py | track the touch point with convexcity defects from the contour of segmented finger |
+| trackking_defect.py | track the touch point with convexcity defects from the contour of segmented finger |
 | tracking_bound.py | track the boundary points from the up and down finger contour |
-| move_tracker.py | transferred the movements of tracked feature points to the movements of finger's real movements |
+| coord_calculator.py | transferred the movements of tracked feature points to the movements of finger's real movements |
 | draw_tools.py | draw points in a board to indicate the movements, and some useful drawing functions |
 
 ### Pipeline

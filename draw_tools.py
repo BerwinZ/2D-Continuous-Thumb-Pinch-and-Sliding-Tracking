@@ -1,5 +1,9 @@
 """
-A board that allow user to draw points on the board
+Drawing tools collections
+1. Draw vertical lines in image
+2. Draw points on image
+3. Draw contours on image
+4. DrawBoard (class)
 """
 
 import cv2
@@ -25,7 +29,11 @@ def draw_vertical_lines(img, line_num=0):
 
 
 def draw_points(img, points, radius=5, color=[0,255,0]):
-    """Draw point(s) in the img
+    """Draw point(s) in the img. Supporting type of points include
+         1. None
+         2. Tuple
+         3. List
+         4. np.ndarray
     
     Arguments:
         img {[type]} -- [description]
@@ -69,9 +77,9 @@ def draw_contours(img, contours, thickness=3, color=[0,255,0]):
         cv2.drawContours(img, [contours], 0, color=color, thickness=thickness)
 
 
-class draw_board:
+class DrawBoard:
     def __init__(self, WIDTH=480, HEIGHT=480, RADIUS=10, MAX_POINTS=10):
-        """Draw board for showing the points
+        """Draw board for points with points persistence
 
         Keyword Arguments:
             LENGTH {int} -- [description] (default: {480})
@@ -132,9 +140,9 @@ class draw_board:
 
 
 if __name__ == '__main__':
-    """Test the draw_board class
+    """Test the DrawBoard class
     """
-    board = draw_board()
+    board = DrawBoard()
     board.draw_filled_point((0, 0), color=[255, 0, 0])
     board.draw_filled_point((100, 0), color=[0, 255, 0])
     cv2.imshow("Board", board.board)

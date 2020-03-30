@@ -1,13 +1,9 @@
 '''
-Lucas-Kanade tracker
-====================
-Lucas-Kanade sparse optical flow demo. 
------
+This script is used to show the optical flow of fingers
 '''
 
 import numpy as np
 import cv2
-import picamera_control
 import sys, traceback
 
 lk_params = dict(winSize=(15, 15),
@@ -16,7 +12,7 @@ lk_params = dict(winSize=(15, 15),
                            0.03))
 
 
-class optical_flow_LK:
+class OpticalFlowLK:
     def __init__(self, IM_WIDTH=None, IM_HEIGHT=None, step=50):
         self._old_gray = None
         self._grid_points = None
@@ -27,7 +23,7 @@ class optical_flow_LK:
             all_points = list(map(tuple, all_points))
             self._grid_points = all_points
 
-    def calc_points(self, new_gray, track_points, draw_img=None):
+    def calc_on_points(self, new_gray, track_points, draw_img=None):
         """Calculate the optical flow on the given points
         
         Arguments:
@@ -66,7 +62,7 @@ class optical_flow_LK:
 
         return direc
 
-    def calc_contour(self, new_gray, contour, draw_img=None):
+    def calc_in_contour(self, new_gray, contour, draw_img=None):
         """Calculate the optical flow on the points inside the contour
         
         Arguments:
@@ -103,13 +99,14 @@ if __name__ == '__main__':
     This function get the frame from the camera, and use thresholding to segment the hand part
     """
     try:
+        import picamera_control
         camera, rawCapture = picamera_control.configure_camera(640,
                                                                480,
                                                                FRAME_RATE=35)
 
         tracks_points = np.float32([(100, 100), (200, 200), (300, 300),
                                     (400, 400)])
-        opt_flow = optical_flow_LK()
+        opt_flow = OpticalFlowLK()
 
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
@@ -117,7 +114,7 @@ if __name__ == '__main__':
             bgr_image = frame.array
             gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
 
-            direc = opt_flow.calc_points(gray, tracks_points, bgr_image)
+            direc = opt_flow.calc_on_points(gray, tracks_points, bgr_image)
             print(direc)
 
             cv2.imshow('lk_track', bgr_image)
