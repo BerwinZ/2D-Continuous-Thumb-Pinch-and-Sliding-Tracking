@@ -10,19 +10,19 @@ from contour_tools import get_defect_points, segment_diff_fingers, \
 from draw_tools import draw_points
 
 
-def extract_features(bgr_image, is_draw):
+def extract_features(bgr_image, output_image=None):
     # ---------------------------------------------
     # 1.1 Get the mask and its contour and apply the mask to image
     # ---------------------------------------------
-    mask, contour = threshold_masking(bgr_image,
-                                      MIN_VALID_CONT_AREA=100000,
-                                      MIN_DEFECT_DISTANCE=5000)
+    mask, contour = threshold_masking(bgr_image)
     finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
     # ---------------------------------------------
     # 1.2 Get defect points
     # ---------------------------------------------
-    defect_points, _ = get_defect_points(contour)
+    defect_points, _ = get_defect_points(contour,
+                                        MIN_VALID_CONT_AREA=100000,
+                                        MIN_DEFECT_DISTANCE=5000)
     if defect_points is None:
         return None
 
@@ -68,11 +68,11 @@ def extract_features(bgr_image, is_draw):
     # ---------------------------------------------
     # 1.6 Check None and form the feature data
     # ---------------------------------------------
-    features = [
+    features = np.array([
         defect_points[0], defect_points[1], up_centroid, down_centroid,
         top_left, top_right, bottom_left, bottom_right, lowest_up,
         rightest_down
-    ]
+    ])
 
     if None in features:
         return None
@@ -80,18 +80,20 @@ def extract_features(bgr_image, is_draw):
     # ---------------------------------------------
     # 1.7 If show the points
     # ---------------------------------------------
-    if is_draw:
+    if output_image is not None:
         # Two defect points (Green), centroid points (Blue), boundary points (Green-blue)
-        draw_points(finger_image, defect_points, color=[0, 255, 0])
-        draw_points(finger_image, up_centroid, color=[255, 0, 0])
-        draw_points(finger_image, down_centroid, color=[255, 0, 0])
-        draw_points(finger_image, top_left, radius=10, color=[255, 255, 0])
-        draw_points(finger_image, top_right, radius=10, color=[255, 255, 0])
-        draw_points(finger_image, bottom_left, radius=10, color=[255, 255, 0])
-        draw_points(finger_image, bottom_right, radius=10, color=[255, 255, 0])
-        draw_points(finger_image, lowest_up, color=[0, 255, 255])
-        draw_points(finger_image, rightest_down, color=[0, 255, 255])
-        # draw_contours(finger_image, down_contour)
+        draw_points(output_image, defect_points, color=[0, 255, 0])
+        draw_points(output_image, up_centroid, color=[255, 0, 0])
+        draw_points(output_image, down_centroid, color=[255, 0, 0])
+        draw_points(output_image, top_left, radius=10, color=[255, 255, 0])
+        draw_points(output_image, top_right, radius=10, color=[255, 255, 0])
+        draw_points(output_image, bottom_left, radius=10, color=[255, 255, 0])
+        draw_points(output_image, bottom_right, radius=10, color=[255, 255, 0])
+        draw_points(output_image, lowest_up, color=[0, 255, 255])
+        draw_points(output_image, rightest_down, color=[0, 255, 255])
+        # draw_contours(output_image, down_contour)
+    
+    return features
 
 if __name__ == '__main__':
     '''
@@ -101,6 +103,7 @@ if __name__ == '__main__':
     import sys, traceback
     import picamera_control
     from draw_tools import DrawBoard
+    import joblib
 
     try:
         IM_WIDTH, IM_HEIGHT = 640, 480
@@ -110,6 +113,10 @@ if __name__ == '__main__':
                                                                FRAME_RATE=40)
         # Show image
         SHOW_IMAGE = True
+
+        # Model
+        model_path = r"./models/step=3/"
+        model = joblib.load(model_path)
 
         # Drawing boards
         DRAW_SCALER = 50
@@ -126,12 +133,15 @@ if __name__ == '__main__':
                                                format="bgr",
                                                use_video_port=True):
             bgr_image = frame.array
-
-            features = extract_features(bgr_image, is_draw=True)
+            out_image = bgr_image.copy()
+            features = extract_features(bgr_image, out_image)
 
             if SHOW_IMAGE:
-                cv2.imshow('Finger', bgr_image)
-            
+                cv2.imshow('Finger', out_image)
+
+            if features is not None:
+                x, y = model.predict(features.features.flattern().reshape(-1, 20))[0]
+                print(x, y)
 
             # ---------------------------------------------
             # 3. User Input
