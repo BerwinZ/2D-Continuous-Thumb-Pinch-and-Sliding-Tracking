@@ -104,6 +104,9 @@ if __name__ == '__main__':
     import picamera_control
     from draw_tools import DrawBoard
     import joblib
+    # import lightgbm as lgb
+    from sklearn.multioutput import MultiOutputRegressor
+    from sklearn.ensemble import RandomForestRegressor
 
     try:
         IM_WIDTH, IM_HEIGHT = 640, 480
@@ -115,8 +118,9 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Model
-        model_path = r"./models/step=3/"
+        model_path = r"./models/step=3/0.893_LGBMRegressor"
         model = joblib.load(model_path)
+        print(model.get_params())
 
         # Drawing boards
         DRAW_SCALER = 50
