@@ -104,6 +104,7 @@ if __name__ == '__main__':
     import picamera_control
     from draw_tools import DrawBoard
     import joblib
+    import pickle
     # import lightgbm as lgb
     from sklearn.multioutput import MultiOutputRegressor
     from sklearn.ensemble import RandomForestRegressor
@@ -118,9 +119,11 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Model
-        model_path = r"./models/step=3/0.893_LGBMRegressor"
+        model_path = r"./models/step=3/0.889_RandomForestRegressor"
         model = joblib.load(model_path)
+        # model = pickle.load(open(model_path, 'rb'))
         print(model.get_params())
+        exit()
 
         # Drawing boards
         DRAW_SCALER = 50

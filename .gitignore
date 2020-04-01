@@ -146,3 +146,5 @@ Backup/
 GeneratedDataset/
 ProcessedData/
 desktop.ini
+dataset/
+models/large_models/
