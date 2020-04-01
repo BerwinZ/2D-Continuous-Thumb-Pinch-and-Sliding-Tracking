@@ -65,7 +65,7 @@ import picamera_control
 import sys, traceback
 from draw_tools import draw_vertical_lines
 from segment_otsu import threshold_masking
-from tracking_defect import get_defect_points
+from contour_tools import get_defect_points
 from draw_tools import draw_points
 from scipy import ndimage
 
