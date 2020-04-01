@@ -119,9 +119,12 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Model
-        model_path = r"./models/step=3/0.889_RandomForestRegressor"
+        model_path = "./models/large_models/0_89_RandomForestRegressor.joblib"
         model = joblib.load(model_path)
+
+        # use .sav file
         # model = pickle.load(open(model_path, 'rb'))
+
         print(model.get_params())
         exit()
 

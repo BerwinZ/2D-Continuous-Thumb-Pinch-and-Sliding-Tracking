@@ -59,7 +59,8 @@ if __name__ == '__main__':
     from draw_tools import draw_vertical_lines, draw_points, DrawBoard
     from segment_otsu import threshold_masking
     from coord_calculator import BoundCalculator
-    from trackking_defect import get_defect_points, get_min_gray_point
+    from contour_tools import get_defect_points, segment_diff_fingers, add_touch_line_to_contour, get_boundary_points
+    from math_tools import get_min_gray_point
 
     try:
         WIDTH, HEIGHT = 640, 480
