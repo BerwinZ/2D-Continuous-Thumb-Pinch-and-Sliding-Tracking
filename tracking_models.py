@@ -119,14 +119,14 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Model
+        print('-' * 60)
+        print('Start Loading Model...')
+
         model_path = "./models/large_models/0_89_RandomForestRegressor.joblib"
         model = joblib.load(model_path)
 
-        # use .sav file
-        # model = pickle.load(open(model_path, 'rb'))
-
         print(model.get_params())
-        exit()
+        print("\nLoad model successfully!")
 
         # Drawing boards
         DRAW_SCALER = 50
@@ -150,7 +150,7 @@ if __name__ == '__main__':
                 cv2.imshow('Finger', out_image)
 
             if features is not None:
-                x, y = model.predict(features.features.flattern().reshape(-1, 20))[0]
+                x, y = model.predict(features.flatten().reshape(-1, 20))[0]
                 print(x, y)
 
             # ---------------------------------------------

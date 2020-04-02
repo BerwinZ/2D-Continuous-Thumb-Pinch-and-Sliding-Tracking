@@ -110,7 +110,8 @@ ENV/
 env.bak/
 venv.bak/
 mcrpnh/
-purenv/
+runenv/
+trainenv/
 
 # Spyder project settings
 .spyderproject
@@ -148,5 +149,5 @@ GeneratedDataset/
 ProcessedData/
 desktop.ini
 dataset/
-models/large_models/
+models/
 test_scripts/Finger_tracking/finger_tracking3/
