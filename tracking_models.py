@@ -20,9 +20,10 @@ def extract_features(bgr_image, output_image=None):
     # ---------------------------------------------
     # 1.2 Get defect points
     # ---------------------------------------------
-    defect_points, _ = get_defect_points(contour,
-                                        MIN_VALID_CONT_AREA=100000,
-                                        MIN_DEFECT_DISTANCE=5000)
+    # defect_points, _ = get_defect_points(contour,
+    #                                     MIN_VALID_CONT_AREA=100000,
+    #                                     MIN_DEFECT_DISTANCE=5000)
+    defect_points, _ = get_defect_points(contour)
     if defect_points is None:
         return None
 
@@ -103,13 +104,14 @@ if __name__ == '__main__':
     import sys, traceback
     import picamera_control
     from draw_tools import DrawBoard
+    from math_tools import configure_kalman_filter
     import joblib
-    import pickle
     # import lightgbm as lgb
     from sklearn.multioutput import MultiOutputRegressor
     from sklearn.ensemble import RandomForestRegressor
 
     try:
+        print('Initializing...')
         IM_WIDTH, IM_HEIGHT = 640, 480
         # Note: Higher framerate will bring noise to the segmented image
         camera, rawCapture = picamera_control.configure_camera(IM_WIDTH,
@@ -118,22 +120,22 @@ if __name__ == '__main__':
         # Show image
         SHOW_IMAGE = True
 
+        # Drawing boards
+        DR_WIDTH, DR_HEIGHT = 320, 320
+        hv_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
+        # hor_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        # ver_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        kalman_filter = configure_kalman_filter()
+
         # Model
         print('-' * 60)
         print('Start Loading Model...')
 
-        model_path = "./models/large_models/0_89_RandomForestRegressor.joblib"
+        model_path = "./models/large_models/0_862_RandomForestRegressor.joblib"
         model = joblib.load(model_path)
 
         print(model.get_params())
         print("\nLoad model successfully!")
-
-        # Drawing boards
-        DRAW_SCALER = 50
-        DR_WIDTH, DR_HEIGHT = 320, 320
-        hv_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
-        hor_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
-        ver_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
 
         print('-' * 60)
         print("Press A to turn ON/OFF the finger image")
@@ -146,12 +148,20 @@ if __name__ == '__main__':
             out_image = bgr_image.copy()
             features = extract_features(bgr_image, out_image)
 
+            if features is not None:
+                coord = model.predict(features.flatten().reshape(-1, 20))[0]
+                kalman_filter.correct(np.float32(coord))
+                filter_ans = kalman_filter.predict()
+                filtered_coord = np.array((int(filter_ans[0]), int(filter_ans[1])))
+                print(filtered_coord)
+                DRAW_SCALER = 5
+                hv_board.draw_filled_point(filtered_coord * DRAW_SCALER)
+
             if SHOW_IMAGE:
                 cv2.imshow('Finger', out_image)
 
-            if features is not None:
-                x, y = model.predict(features.flatten().reshape(-1, 20))[0]
-                print(x, y)
+            cv2.imshow('Board', hv_board.board)
+
 
             # ---------------------------------------------
             # 3. User Input
