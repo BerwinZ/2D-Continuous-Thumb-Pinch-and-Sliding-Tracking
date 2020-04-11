@@ -301,3 +301,9 @@ def get_touch_line_curve(IS_UP,
         draw_points(draw_image, points, radius=3, color=color)
 
     return curve, theta
+
+
+def __rotate_array(theta):
+    return np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
+
