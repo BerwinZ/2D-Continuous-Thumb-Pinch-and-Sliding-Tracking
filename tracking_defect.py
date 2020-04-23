@@ -101,6 +101,8 @@ if __name__ == '__main__':
         print("Press F to turn ON/OFF the kalman filter")
         print('-' * 60)
 
+        capture_index = 0
+        
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
                                                use_video_port=True):
@@ -115,47 +117,19 @@ if __name__ == '__main__':
             finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
 
             # Get convexity defects points from the contour
-            defect_points, _ = get_defect_points(contour,
+            defect_points, hull_lines = get_defect_points(contour,
                                                  MIN_VALID_CONT_AREA=100000,
                                                  MIN_DEFECT_DISTANCE=5000)
 
-            # Get touch point from the defect points and the img
-            touch_point, filter_touch_point = get_touch_point(
-                defect_points, finger_image, kalman_filter=kalman_filter)
+            # Two defect points (Blue)
+            draw_points(finger_image, defect_points, color=[255, 0, 0], radius=8)
 
-            # Two defect points (Green)
-            draw_points(finger_image, defect_points, color=[0, 255, 0])
-            # Raw touch point (Red)
-            draw_points(finger_image, touch_point, color=[0, 0, 255])
-            # Filter touch point (Blue)
-            draw_points(finger_image, filter_touch_point, color=[255, 0, 0])
-
+            if hull_lines is not None:
+                cv2.line(finger_image, hull_lines[0][0], hull_lines[0][1],color=[0, 255, 0], thickness=3)
+                cv2.line(finger_image, hull_lines[1][0], hull_lines[1][1],color=[0, 255, 0], thickness=3)
+            
             # Display
             cv2.imshow('Finger', finger_image)
-
-            # ---------------------------------------------
-            # 2. Application
-            # ---------------------------------------------
-
-            # Track the touch point
-            if filter_touch_point:
-                touch_point = filter_touch_point
-            dx, dy = tracker.calc_coord(touch_point)
-
-            # Draw the touch point track
-            DRAW_SCALER = 50
-            if dx is not None:
-                dx = -dx * DRAW_SCALER
-                dy = dy * DRAW_SCALER
-            hor_board.draw_filled_point((dx, 0))
-            ver_board.draw_filled_point((0, dy))
-            hv_board.draw_filled_point((dx, dy))
-
-            # Display
-            H_V_joint = np.concatenate(
-                (hv_board.board, hor_board.board, ver_board.board), axis=1)
-            draw_vertical_lines(H_V_joint, 2)
-            cv2.imshow('H V Movement', H_V_joint)
 
             # if the user pressed ESC, then stop looping
             keypress = cv2.waitKey(1) & 0xFF
@@ -173,6 +147,9 @@ if __name__ == '__main__':
                 else:
                     kalman_filter = None
                     print("Kalman Filter OFF")
+            elif keypress == ord('s'):
+                cv2.imwrite("./capture/hand_" + str(capture_index) + ".png",
+                    finger_image)
 
             rawCapture.truncate(0)
 

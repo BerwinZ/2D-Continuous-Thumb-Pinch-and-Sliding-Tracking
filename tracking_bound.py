@@ -87,6 +87,8 @@ if __name__ == '__main__':
         print("Press 'D' to turn on/off the contour drawing")
         print('-' * 60)
 
+        capture_index = 0
+
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
                                                use_video_port=True):
@@ -104,13 +106,12 @@ if __name__ == '__main__':
             defect_points, _ = get_defect_points(contour,
                                                  MIN_VALID_CONT_AREA=100000,
                                                  MIN_DEFECT_DISTANCE=5000)
-            draw_points(finger_image, defect_points)
 
             # Get the touch lines
             touch_line = get_touch_line_samples(finger_image,
                                         defect_points,
                                         line_points_num=10)
-            draw_points(finger_image, touch_line)
+            # draw_points(finger_image, touch_line)
 
             # Segment the two fingers
             up_finger_contour, down_finger_contour = segment_diff_fingers(
@@ -120,11 +121,11 @@ if __name__ == '__main__':
             down_finger_contour = add_touch_line_to_contour(False, down_finger_contour,
                                                  defect_points, touch_line)
 
-            if up_finger_contour is not None and DRAW_CONTOUR:
-                cv2.drawContours(finger_image, [up_finger_contour], 0,
-                                 [0, 0, 255], 3)
-                cv2.drawContours(finger_image, [down_finger_contour], 0,
-                                 [255, 0, 0], 3)
+            # if up_finger_contour is not None and DRAW_CONTOUR:
+            #     cv2.drawContours(finger_image, [up_finger_contour], 0,
+            #                      [0, 0, 255], 3)
+            #     cv2.drawContours(finger_image, [down_finger_contour], 0,
+            #                      [255, 0, 0], 3)
 
             # Get four points
             bound_points = get_boundary_points(up_finger_contour,
@@ -132,32 +133,14 @@ if __name__ == '__main__':
                                             bgr_image.shape[0],
                                             bgr_image.shape[1])
 
-            to_draw = [bound_points[0], bound_points[3]]
-            draw_points(finger_image, to_draw, radius=10, color=[0, 0, 255])
+            draw_points(finger_image, bound_points[0], radius=10, color=[0, 0, 255])
+            draw_points(finger_image, bound_points[1], radius=10, color=[0, 0, 255])
+            draw_points(finger_image, bound_points[2], radius=10, color=[0, 0, 255])
+            draw_points(finger_image, bound_points[3], radius=10, color=[0, 0, 255])
 
             # Display
             cv2.imshow('Finger', finger_image)
 
-            # ---------------------------------------------
-            # 2. Application
-            # ---------------------------------------------
-
-            dx, dy = tracker.calc_coord(bound_points[0], bound_points[3])
-
-            # Draw the touch point track
-            DRAW_SCALER = 50
-            if dx is not None:
-                dx = -dx * DRAW_SCALER
-                dy = dy * DRAW_SCALER
-            hor_board.draw_filled_point((dx, 0))
-            ver_board.draw_filled_point((0, dy))
-            hv_board.draw_filled_point((dx, dy))
-
-            # Display
-            H_V_joint = np.concatenate(
-                (hv_board.board, hor_board.board, ver_board.board), axis=1)
-            draw_vertical_lines(H_V_joint, 2)
-            cv2.imshow('H V Movement', H_V_joint)
 
             # if the user pressed ESC, then stop looping
             keypress = cv2.waitKey(1) & 0xFF
@@ -172,6 +155,10 @@ if __name__ == '__main__':
             elif keypress == ord('d'):
                 DRAW_CONTOUR = not DRAW_CONTOUR
                 print("Draw contour: ", DRAW_CONTOUR)
+            elif keypress == ord('s'):
+                cv2.imwrite("./capture/hand_" + str(capture_index) + ".png",
+                    finger_image) 
+                capture_index += 1
 
             rawCapture.truncate(0)
 

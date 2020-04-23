@@ -7,6 +7,7 @@ It includes:
 3. Draw the movements in a drawing board
 '''
 
+tmp_mask = None
 
 def threshold_masking(img):
     """Get the mask for the img
@@ -34,6 +35,9 @@ def threshold_masking(img):
     # Otsu Thresholding
     _, mask = cv2.threshold(img_ycrcb[:, :, 1], 0, 255,
                             cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+    global tmp_mask
+    tmp_mask = mask
 
     # Erode or dilate the edges that has been removed
     kernel_size = min(img.shape[0], img.shape[1]) // 50
@@ -81,6 +85,7 @@ if __name__ == '__main__':
         camera, rawCapture = picamera_control.configure_camera(640,
                                                                480,
                                                                FRAME_RATE=35)
+        capture_index = 0
 
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
@@ -99,18 +104,30 @@ if __name__ == '__main__':
             segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
             cv2.drawContours(segment, [max_contour],
                              0, [0, 0, 255],
-                             thickness=3)
+                             thickness=5)
 
             # Display
-            image_joint = np.concatenate((bgr_image, segment), axis=1)
-            draw_vertical_lines(image_joint, 1)
-            cv2.imshow('Image', image_joint)
+            # image_joint = np.concatenate((bgr_image, segment), axis=1)
+            # draw_vertical_lines(image_joint, 1)
+            cv2.imshow('Image', bgr_image)
+            cv2.imshow('Segment', segment)
             cv2.imshow('Mask', mask)
+            cv2.imshow('Tmp Mask', tmp_mask)
 
             # if the user pressed ESC, then stop looping
             keypress = cv2.waitKey(25) & 0xFF
             if keypress == 27:
                 break
+            elif keypress == ord('s'):
+                cv2.imwrite("./capture/hand_" + str(capture_index) + ".png",
+                        bgr_image)
+                cv2.imwrite("./capture/segment_" + str(capture_index) + ".png",
+                        segment)
+                cv2.imwrite("./capture/mask_" + str(capture_index) + ".png",
+                        mask)
+                cv2.imwrite("./capture/tmp_mask_" + str(capture_index) + ".png",
+                        tmp_mask)
+                capture_index += 1
 
             rawCapture.truncate(0)
 

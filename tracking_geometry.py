@@ -214,6 +214,8 @@ if __name__ == '__main__':
         print("Press A to turn ON/OFF the finger image")
         print('-' * 60)
 
+        capture_index = 0
+        
         for frame in camera.capture_continuous(rawCapture,
                                                format="bgr",
                                                use_video_port=True):
@@ -248,21 +250,23 @@ if __name__ == '__main__':
             top_left, top_right, bottom_left, bottom_right = get_boundary_points(
                 up_contour, down_contour, IM_HEIGHT, IM_WIDTH)
 
-            up_touch_line, _ = get_touch_line_curve(
+            touch_line_image = finger_image.copy()
+
+            up_touch_line, _, up_line_points = get_touch_line_curve(
                 IS_UP=True,
                 contour=up_contour,
                 bound_points=(top_left, top_right),
                 fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 4)),
                 defect_points=defect_points,
-                draw_image=None)
+                draw_image=touch_line_image)
 
-            down_touch_line, theta = get_touch_line_curve(
+            down_touch_line, theta, down_line_points = get_touch_line_curve(
                 IS_UP=False,
                 contour=down_contour,
                 bound_points=(bottom_left, bottom_right),
                 fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 3)),
                 defect_points=defect_points,
-                draw_image=None)
+                draw_image=touch_line_image)
 
             # ---------------------------------------------
             # 1.5 Get centroids of contours
@@ -271,94 +275,39 @@ if __name__ == '__main__':
             down_centroid = get_centroid(down_contour)
 
             # ---------------------------------------------
-            # 1.6 Get touch point
+            # 1.6 Two special points
             # ---------------------------------------------
-            touch_point = get_touch_point(defect_points=defect_points,
-                                          up_centroid=up_centroid,
-                                          down_centroid=down_centroid,
-                                          up_touch_line=up_touch_line,
-                                          down_touch_line=down_touch_line,
-                                          theta=theta,
-                                          image_for_grad=None)
-
-            # ---------------------------------------------
-            # 1.7 Calculate optical flow
-            # ---------------------------------------------
-            gray_img = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
-
-            up_direcs = opt_flow_up.calc_contour(gray_img,
-                                                 up_contour,
-                                                 draw_img=None)
-
-            down_direcs = opt_flow_down.calc_contour(gray_img,
-                                                     down_contour,
-                                                     draw_img=None)
-
-            show_whole_finger_motion(up_direcs, down_direcs)
-
-            # real_x = tracker.coor_to_real_len(up_touch_line, up_centroid, touch_point)
+            lowest_thumb, rightest_index = None, None
+            if up_contour is not None and up_line_points is not None:
+                index = np.where(up_contour[:, 0, 1] == max(up_contour[:, 0, 1]))[0][0]
+                p1 = tuple(up_contour[index, 0, :])
+                index = np.where(up_line_points[:, 1] == max(up_line_points[:, 1]))[0][0]
+                p2 = tuple(up_line_points[index])
+                lowest_thumb = p1 if p1[1] > p2[1] else p2 
+               
+            if down_contour is not None and down_line_points is not None:
+                index = np.where(down_contour[:, 0, 0] == max(down_contour[:, 0, 0]))[0][0]
+                p1 = tuple(down_contour[index, 0, :])
+                index = np.where(down_line_points[:, 0] == max(down_line_points[:, 0]))[0][0]
+                p2 = tuple(down_line_points[index])
+                rightest_index = p1 if p1[0] > p2[0] else p2 
 
             # ---------------------------------------------
             # 1.8 Draw elements
             # ---------------------------------------------
             # Two defect points (Green), touch point (Red), centroid points (Pink)
-            draw_points(finger_image, defect_points, color=[0, 255, 0])
-            draw_points(finger_image, touch_point, color=[255, 255, 255])
+            # draw_points(finger_image, defect_points, color=[0, 255, 0])
+            # draw_points(finger_image, touch_point, color=[255, 255, 255])
             draw_points(finger_image, up_centroid, color=[255, 0, 0])
             draw_points(finger_image, down_centroid, color=[255, 0, 0])
+            draw_points(finger_image, lowest_thumb, color=[0, 0, 255])
+            draw_points(finger_image, rightest_index, color=[0, 0, 255])
 
             # ---------------------------------------------
             # 1.9 Show image
             # ---------------------------------------------
-            if SHOW_IMAGE:
-                image_joint = np.concatenate((bgr_image, finger_image), axis=1)
-                draw_vertical_lines(image_joint, 1)
-                cv2.imshow('Finger', image_joint)
-
-            # ---------------------------------------------
-            # 2. Application
-            # ---------------------------------------------
-
-            # ---------------------------------------------
-            # 2.1 Use tracker to calculate the movements
-            # ---------------------------------------------
-            dx, dy = tracker.calc_coord(up_touch_line, up_centroid,
-                                              touch_point)
-
-            # ---------------------------------------------
-            # 2.2 Show parameters
-            # ---------------------------------------------
-            # x1 = points_distance(touch_point, up_centroid)
-            # x2 = points_distance(touch_point, down_centroid)
-            # if x1 is not None and x2 is not None:
-            #     x1 = round(x1, 0)
-            #     x2 = round(x2, 0)
-            #     x3 = round(x1 + x2, 0)
-            #     print(x1, x2, x3)
-
-            # if dx is not None and up_contour is not None and defect_points is not None:
-            #     print(round(dx, 2), round(dy, 2),
-            #          cv2.contourArea(up_contour),
-            #          cv2.contourArea(down_contour),
-            #          round(points_distance(defect_points[0], defect_points[1]), 1))
-
-            # ---------------------------------------------
-            # 2.3 Draw the movments in the drawing board
-            # ---------------------------------------------
-            if dx is not None and dy is not None:
-                dx = -dx * DRAW_SCALER
-                dy = dy * DRAW_SCALER
-            hor_board.draw_filled_point((dx, 0))
-            ver_board.draw_filled_point((0, dy))
-            hv_board.draw_filled_point((dx, dy))
-
-            # ---------------------------------------------
-            # 2.4 Display
-            # ---------------------------------------------
-            move_joint = np.concatenate(
-                (hv_board.board, hor_board.board, ver_board.board), axis=1)
-            draw_vertical_lines(move_joint, 2)
-            cv2.imshow('Finger Track', move_joint)
+            cv2.imshow('Finger', finger_image)
+            cv2.imshow('Touch Line', touch_line_image)
 
             # ---------------------------------------------
             # 3. User Input
@@ -374,7 +323,11 @@ if __name__ == '__main__':
                 hor_board.reset_board()
                 ver_board.reset_board()
             elif keypress == ord('s'):
-                cv2.imwrite('screenshot.jpg', finger_image)
+                cv2.imwrite("./capture/hand_" + str(capture_index) + ".png",
+                    finger_image) 
+                cv2.imwrite("./capture/TouchLine_" + str(capture_index) + ".png",
+                    touch_line_image) 
+                capture_index += 1
             elif keypress == ord('a'):
                 if SHOW_IMAGE:
                     cv2.destroyWindow("Finger")

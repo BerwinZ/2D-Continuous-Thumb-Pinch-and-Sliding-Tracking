@@ -16,6 +16,7 @@ This script provide methods to operate the contours
 
 import numpy as np
 import cv2
+from draw_tools import draw_points
 
 def get_defect_points(contour, MIN_VALID_CONT_AREA=0, MIN_DEFECT_DISTANCE=0):
     """Get the two convex defect points
@@ -242,12 +243,12 @@ def get_touch_line_curve(IS_UP,
         theta [float]
     """
     if contour is None or fitting_curve is None or defect_points is None:
-        return None, None
+        return None, None, None
 
     # Get the points used to fit
     if bound_points is None or bound_points[0] is None or bound_points[
             1] is None:
-        return None, None
+        return None, None, None
 
     (x1, y1), (x2, y2) = bound_points
     contour = np.reshape(contour, (contour.shape[0], 2))
@@ -274,30 +275,35 @@ def get_touch_line_curve(IS_UP,
     X = contour[:, 0]
     Y = contour[:, 1]
     if len(X) == 0 or len(Y) == 0:
-        return None, None
+        return None, None, None
     
     curve = fitting_curve(X, Y)
+    
+    # Get the touch line x range
+    p_x = np.arange(defect_points[0][0], defect_points[1][0])
+    p_y = np.array(curve(p_x))
+    # Reshape
+    num = p_x.shape[0]
+    p_x = np.reshape(p_x, (num, 1))
+    p_y = np.reshape(p_y, (num, 1))
+    # Joint
+    points = np.concatenate((p_x, p_y), axis=1)
+
+    if not IS_UP:
+        rotate = __rotate_array(-theta)
+        points = rotate.dot(points.T).T
+
+    points = points.astype("int")
 
     if draw_image is not None:
         # Draw the points used to fit
         color = [0, 0, 255] if IS_UP else [255, 0, 0]
-        draw_points(draw_image, contour.astype("int"), radius=3, color=color)
-
-        # Get the touch line x range
-        p_x = np.arange(defect_points[0][0], defect_points[1][0])
-        p_y = np.array(curve(p_x))
-        # Reshape
-        num = p_x.shape[0]
-        p_x = np.reshape(p_x, (num, 1))
-        p_y = np.reshape(p_y, (num, 1))
-        # Joint
-        points = np.concatenate((p_x, p_y), axis=1)
-
-        if not IS_UP:
-            rotate = __rotate_array(-theta)
-            points = rotate.dot(points.T).T
-
-        points = points.astype("int")
+        # draw_points(draw_image, contour.astype("int"), radius=3, color=color)
+        
         draw_points(draw_image, points, radius=3, color=color)
 
-    return curve, theta
+    return curve, theta, points
+
+def __rotate_array(theta):
+    return np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
