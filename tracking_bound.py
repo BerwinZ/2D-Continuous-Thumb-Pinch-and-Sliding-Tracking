@@ -57,9 +57,9 @@ if __name__ == '__main__':
 
     import picamera_control
     from draw_tools import draw_vertical_lines, draw_points, DrawBoard
-    from segment_otsu import threshold_masking
+    from image_segment import threshold_masking
     from coord_calculator import BoundCalculator
-    from contour_tools import get_defect_points, segment_diff_fingers, add_touch_line_to_contour, get_boundary_points
+    from feature_extraction import get_defect_points, segment_diff_fingers, add_touch_line_to_contour, get_boundary_points
     from math_tools import get_min_gray_point
 
     try:
@@ -97,8 +97,7 @@ if __name__ == '__main__':
             # ---------------------------------------------
 
             # Get the mask and its contour using the Otsu thresholding method and apply the mask to image
-            mask, contour = threshold_masking(bgr_image)
-            finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
+            mask, contour, finger_image = threshold_masking(bgr_image)
 
             # Get defect points from the contour
             defect_points, _ = get_defect_points(contour,

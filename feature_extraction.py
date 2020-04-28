@@ -1,5 +1,7 @@
 """
-This script provide methods to operate the contours
+This script provide methods to extract the features from the images. The extractions are based on the contour of the fingers.
+
+It also includes several functions which can be used indepently
 1. get_defect_points
     Get left and right defect points from contour
 2. segment_diff_fingers
@@ -16,6 +18,97 @@ This script provide methods to operate the contours
 
 import numpy as np
 import cv2
+from draw_tools import draw_points
+
+def extract_features(contour, im_height, im_width, output_image=None):
+    """Extract features
+
+    Arguments:
+        contour {[type]} -- [description]
+        im_height {[type]} -- [description]
+        im_width {[type]} -- [description]
+
+    Keyword Arguments:
+        output_image {[type]} -- [description] (default: {None})
+
+    Returns:
+        array -- 1 * 20 array
+    """
+    # ---------------------------------------------
+    # 1.1 Get 2 defect points
+    # ---------------------------------------------
+    # dft_pts, _ = get_defect_points(contour,
+    #                                     MIN_VALID_CONT_AREA=100000,
+    #                                     MIN_DEFECT_DISTANCE=5000)
+    dft_pts, _ = get_defect_points(contour)
+
+    # ---------------------------------------------
+    # 1.2 Divide up and down finger contour and get 2 centroids
+    # ---------------------------------------------
+    thumb_cnt, index_cnt = segment_diff_fingers(contour, dft_pts)
+    thumb_cent = get_centroid(thumb_cnt)
+    index_cent = get_centroid(index_cnt)
+
+    # ---------------------------------------------
+    # 1.3 Get 4 boundary points
+    # ---------------------------------------------
+    top_left, top_right, bottom_left, bottom_right = get_boundary_points(
+        thumb_cnt, index_cnt, im_height, im_width)
+
+    # ---------------------------------------------
+    # 1.4 Get touch line, then lowest thumb point and rightest index finger point
+    # ---------------------------------------------
+    _, _, thumb_touch_pts = get_touch_line_curve(
+        IS_UP=True,
+        contour=thumb_cnt,
+        bound_points=(top_left, top_right),
+        fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 4)),
+        defect_points=dft_pts)
+
+    _, _, index_touch_pts = get_touch_line_curve(
+        IS_UP=False,
+        contour=index_cnt,
+        bound_points=(bottom_left, bottom_right),
+        fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 3)),
+        defect_points=dft_pts)
+
+    lowest_thumb   = get_special_pt(thumb_cnt, thumb_touch_pts, 'lowest')
+    rightest_index = get_special_pt(index_cnt, index_touch_pts, 'rightest')
+
+    # ---------------------------------------------
+    # 1.5 Check None and form the feature data
+    # ---------------------------------------------
+    if dft_pts is None:
+        return None
+    
+    # dft pts is list of tuple, others are all tuple
+    features = np.array([
+        dft_pts[0], dft_pts[1], thumb_cent, index_cent,
+        top_left, top_right, bottom_left, bottom_right, 
+        lowest_thumb, rightest_index
+    ])
+    
+    if None in features:
+        return None
+
+    features = features.flatten()
+
+    # ---------------------------------------------
+    # 1.6 If show the points
+    # ---------------------------------------------
+    if output_image is not None:
+        # Two defect points (Green), centroid points (Blue), boundary points (Green-blue)
+        draw_points(output_image, dft_pts, color=[0, 255, 0])
+        draw_points(output_image, thumb_cent, color=[255, 0, 0])
+        draw_points(output_image, index_cent, color=[255, 0, 0])
+        draw_points(output_image, top_left, radius=10, color=[255, 255, 0])
+        draw_points(output_image, top_right, radius=10, color=[255, 255, 0])
+        draw_points(output_image, bottom_left, radius=10, color=[255, 255, 0])
+        draw_points(output_image, bottom_right, radius=10, color=[255, 255, 0])
+        draw_points(output_image, lowest_thumb, color=[0, 255, 255])
+        draw_points(output_image, rightest_index, color=[0, 255, 255])
+    
+    return features
 
 def get_defect_points(contour, MIN_VALID_CONT_AREA=0, MIN_DEFECT_DISTANCE=0):
     """Get the two convex defect points
@@ -140,62 +233,42 @@ def get_boundary_points(up_contour, down_contour, height, width):
     if up_contour is None or down_contour is None or height is None or width is None:
         return None, None, None, None
 
-    top_left = None
-    left_bd = np.where(up_contour[:, 0, 0] == 0)[0]
-    if len(left_bd) > 0:
-        y_list = up_contour[left_bd, 0, 1]
-        top_left = (0, max(y_list))
-    else:
-        top_bd = np.where(up_contour[:, 0, 1] == 0)[0]
-        if len(top_bd) > 0:
-            x_list = up_contour[top_bd, 0, 0]
-            top_left = (min(x_list), 0)
-        else:
-            top_left = None
+    up_cnt   = np.reshape(up_contour,   (up_contour.shape[0],   2))
+    down_cnt = np.reshape(down_contour, (down_contour.shape[0], 2))
 
-    top_right = None
-    right_bd = np.where(up_contour[:, 0, 0] == width - 1)[0]
-    if len(right_bd) > 0:
-        y_list = up_contour[right_bd, 0, 1]
-        top_right = (width - 1, max(y_list))
-    else:
-        top_bd = np.where(up_contour[:, 0, 1] == 0)[0]
-        if len(top_bd) > 0:
-            x_list = up_contour[top_bd, 0, 0]
-            top_right = (max(x_list), 0)
+    def get_pt(contour, bd_info, pt_info):
+        bd_basis, bd_val = bd_info
+        bd_idx = np.where(contour[:, bd_basis] == bd_val)[0]
+        if len(bd_idx) > 0:
+            bd     = contour[bd_idx]
+            pt_basis, pt_f = pt_info
+            pt_idx = np.where(bd[:, pt_basis] == pt_f(bd[:, pt_basis]))[0][0]
+            return tuple(bd[pt_idx])
         else:
-            top_right = None
+            return None
 
-    bottom_left = None
-    left_bd = np.where(down_contour[:, 0, 0] == 0)[0]
-    if len(left_bd) > 0:
-        y_list = down_contour[left_bd, 0, 1]
-        bottom_left = (0, min(y_list))
-    else:
-        bottom_bd = np.where(down_contour[:, 0, 1] == height - 1)[0]
-        if len(bottom_bd) > 0:
-            x_list = down_contour[bottom_bd, 0, 0]
-            bottom_left = (min(x_list), height - 1)
-        else:
-            bottom_left = None
+    bd_dict = {'top'  : [1, 0],
+               'down' : [1, height-1],
+               'left' : [0, 0],
+               'right': [0, width-1]}
 
-    bottom_right = None
-    right_bd = np.where(down_contour[:, 0, 0] == width - 1)[0]
-    if len(right_bd) > 0:
-        y_list = down_contour[right_bd, 0, 1]
-        bottom_right = (width - 1, min(y_list))
-    else:
-        bottom_bd = np.where(down_contour[:, 0, 1] == height - 1)[0]
-        if len(bottom_bd) > 0:
-            x_list = down_contour[bottom_bd, 0, 0]
-            bottom_right = (max(x_list), height - 1)
-        else:
-            left_bd = np.where(down_contour[:, 0, 0] == 0)[0]
-            if len(left_bd) > 0:
-                y_list = down_contour[left_bd, 0, 1]
-                bottom_right = (0, max(y_list))
-            else:
-                bottom_right = None
+    top_left = get_pt(up_cnt, bd_dict['left'], mode_dict['lowest'])
+    if top_left is None:
+        top_left = get_pt(up_cnt, bd_dict['top'], mode_dict['leftest'])
+
+    top_right = get_pt(up_cnt, bd_dict['right'], mode_dict['lowest'])
+    if top_right is None:
+        top_right = get_pt(up_cnt, bd_dict['top'], mode_dict['rightest'])
+    
+    bottom_left = get_pt(down_cnt, bd_dict['left'], mode_dict['upest'])
+    if bottom_left is None:
+        bottom_left = get_pt(down_cnt, bd_dict['down'], mode_dict['leftest'])
+
+    bottom_right = get_pt(down_cnt, bd_dict['right'], mode_dict['upest'])
+    if bottom_right is None:
+        bottom_right = get_pt(down_cnt, bd_dict['down'], mode_dict['rightest'])
+    if bottom_right is None:
+        bottom_right = get_pt(down_cnt, bd_dict['left'], mode_dict['lowest'])
 
     return top_left, top_right, bottom_left, bottom_right
 
@@ -206,18 +279,18 @@ def get_centroid(contour):
         contour {[type]} -- [description]
     
     Returns:
-        [type] -- [description]
+        centroid -- tuple
     """
     if contour is None:
-        return None, None
+        return None
 
     moment = cv2.moments(contour)
     if moment['m00'] != 0:
         cx = int(moment['m10'] / moment['m00'])
         cy = int(moment['m01'] / moment['m00'])
-        return cx, cy
+        return (cx, cy)
     else:
-        return None, None
+        return None
 
 def get_touch_line_curve(IS_UP,
                      contour,
@@ -239,15 +312,20 @@ def get_touch_line_curve(IS_UP,
     
     Returns:
         curve [lambda function]
-        theta [float]
+        theta  [float]
+        points [n * 2 array]
     """
     if contour is None or fitting_curve is None or defect_points is None:
-        return None, None
+        return None, None, None
 
     # Get the points used to fit
     if bound_points is None or bound_points[0] is None or bound_points[
             1] is None:
-        return None, None
+        return None, None, None
+
+    def __rotate_array(theta):
+        return np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
 
     (x1, y1), (x2, y2) = bound_points
     contour = np.reshape(contour, (contour.shape[0], 2))
@@ -274,36 +352,71 @@ def get_touch_line_curve(IS_UP,
     X = contour[:, 0]
     Y = contour[:, 1]
     if len(X) == 0 or len(Y) == 0:
-        return None, None
+        return None, None, None
     
     curve = fitting_curve(X, Y)
+
+    # Get the touch line x range
+    p_x = np.arange(defect_points[0][0], defect_points[1][0])
+    p_y = np.array(curve(p_x))
+    # Reshape
+    num = p_x.shape[0]
+    p_x = np.reshape(p_x, (num, 1))
+    p_y = np.reshape(p_y, (num, 1))
+    # Joint
+    points = np.concatenate((p_x, p_y), axis=1)
+
+    if not IS_UP:
+        rotate = __rotate_array(-theta)
+        points = rotate.dot(points.T).T
+
+    points = points.astype("int")
 
     if draw_image is not None:
         # Draw the points used to fit
         color = [0, 0, 255] if IS_UP else [255, 0, 0]
         draw_points(draw_image, contour.astype("int"), radius=3, color=color)
-
-        # Get the touch line x range
-        p_x = np.arange(defect_points[0][0], defect_points[1][0])
-        p_y = np.array(curve(p_x))
-        # Reshape
-        num = p_x.shape[0]
-        p_x = np.reshape(p_x, (num, 1))
-        p_y = np.reshape(p_y, (num, 1))
-        # Joint
-        points = np.concatenate((p_x, p_y), axis=1)
-
-        if not IS_UP:
-            rotate = __rotate_array(-theta)
-            points = rotate.dot(points.T).T
-
-        points = points.astype("int")
         draw_points(draw_image, points, radius=3, color=color)
 
-    return curve, theta
+    return curve, theta, points
 
 
-def __rotate_array(theta):
-    return np.array([[np.cos(theta), -np.sin(theta)],
-                     [np.sin(theta), np.cos(theta)]])
+mode_dict = {'lowest': [1, max], 
+             'upest':  [1, min],
+             'leftest':[0, min],
+             'rightest':[0, max]}
+
+def get_special_pt(contour, touch_pts, mode='lowest'):
+    """Return the special point
+
+    Arguments:
+        contour {[type]} -- [description]
+        touch_pts {[type]} -- [description]
+
+    Keyword Arguments:
+        mode {str} -- [description] (default: {'lowest'})
+
+    Returns:
+        pt -- tuple
+    """
+
+    if contour is None or touch_pts is None or len(touch_pts) == 0:
+        return None
+
+    if mode not in mode_dict:
+        return None
+
+    contour = np.reshape(contour, (contour.shape[0], 2))
+    pt = None
+    basis, f = mode_dict[mode]
+
+    index = np.where(contour[:, basis] == f(contour[:, basis]))[0][0]
+    p1 = tuple(contour[index])
+
+    index = np.where(touch_pts[:, basis] == f(touch_pts[:, basis]))[0][0]
+    p2 = tuple(touch_pts[index])
+
+    pt = p1 if p1[basis] == f(p1[basis], p2[basis]) else p2
+
+    return pt
 

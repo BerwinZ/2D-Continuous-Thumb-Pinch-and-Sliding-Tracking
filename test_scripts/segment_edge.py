@@ -64,8 +64,8 @@ from time import sleep
 import picamera_control
 import sys, traceback
 from draw_tools import draw_vertical_lines
-from segment_otsu import threshold_masking
-from contour_tools import get_defect_points
+from image_segment import threshold_masking
+from feature_extraction import get_defect_points
 from draw_tools import draw_points
 from scipy import ndimage
 
@@ -88,8 +88,7 @@ if __name__ == '__main__':
                                                format="bgr",
                                                use_video_port=True):
             bgr_image = frame.array
-            mask, contour = threshold_masking(bgr_image)
-            finger_image = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
+            mask, contour, finger_image = threshold_masking(bgr_image)
 
             defect_points, _ = get_defect_points(contour,
                                                  MIN_VALID_CONT_AREA=100000,

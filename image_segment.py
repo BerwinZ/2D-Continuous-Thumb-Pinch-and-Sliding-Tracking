@@ -8,35 +8,29 @@ It includes:
 '''
 
 
-def threshold_masking(img):
-    """Get the mask for the img
+def threshold_masking(bgr_img):
+    """Get the mask for the bgr_img
     1. Use Otsu thresholding
     2. Erode and dilate to remove noise
     3. Get the area with the max contour 
 
     Arguments:
-        img {np.array} -- [BGR Image]
+        bgr_img {np.array} -- [BGR Image]
 
     Returns:
-        Mask [np.array] -- [0/255 Mask]
-        Contour [3-d array] -- [The contour of the mask] 
+        mask [np.array] -- [0/255 Mask]
+        max_contour [3-d array] -- [The contour of the mask] 
+        masked_image [np.array] -- [Adopt the mask to the input bgr image]
     """
     # Convert to YCrCb
-    img_ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCR_CB)
-
-    # Cr and Cb Channels
-    # mask_ycrcb = cv2.inRange(frame_ycrcb, np.array(
-    #     [0, 145, 85]), np.array([255, 185, 155]))
-
-    # Just use Y channel
-    # mask = cv2.inRange(img_ycrcb[:,:,0], np.array([0]), np.array([150]))
+    img_ycrcb = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2YCR_CB)
 
     # Otsu Thresholding
     _, mask = cv2.threshold(img_ycrcb[:, :, 1], 0, 255,
                             cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
     # Erode or dilate the edges that has been removed
-    kernel_size = min(img.shape[0], img.shape[1]) // 50
+    kernel_size = min(bgr_img.shape[0], bgr_img.shape[1]) // 50
     element = cv2.getStructuringElement(cv2.MORPH_RECT,
                                         (kernel_size, kernel_size))
     mask = cv2.erode(mask, element)
@@ -62,7 +56,9 @@ def threshold_masking(img):
         canvas = np.zeros(mask.shape).astype('uint8')
         mask = cv2.drawContours(canvas, contours, max_index, 255, -1)
 
-    return mask, max_contour
+    masked_image = cv2.bitwise_and(bgr_img, bgr_img, mask=mask)
+
+    return mask, max_contour, masked_image
 
 
 import cv2
@@ -93,10 +89,9 @@ if __name__ == '__main__':
             # cv2.imshow("Cb", img_ycrcb[:,:,2])
 
             # Get the mask using the Otsu thresholding method
-            mask, max_contour = threshold_masking(bgr_image)
+            mask, max_contour, segment = threshold_masking(bgr_image)
 
-            # Apply the mask to the image
-            segment = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
+            # Draw contours
             cv2.drawContours(segment, [max_contour],
                              0, [0, 0, 255],
                              thickness=3)
