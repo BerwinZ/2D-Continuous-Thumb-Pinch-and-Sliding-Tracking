@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     from math_tools import KalmanFilter
     import draw_tools as dtl
-    from opt_flow_LK import OpticalFlowLK
+    # from opt_flow_LK import OpticalFlowLK
 
     """
     This function get the frame from the camera, and use thresholding to finger_image the hand part

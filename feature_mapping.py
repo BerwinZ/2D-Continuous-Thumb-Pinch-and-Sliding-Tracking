@@ -221,7 +221,39 @@ class ImmMapping:
        
 
 class MknnMapping:
-    pass
+    def __init__(self, calc_comp_path, model_path_x, model_path_y):
+        """Use knn regression model to map features
+        """
+        from sklearn.neighbors import KNeighborsRegressor
+        import joblib
+        import csv
+        import numpy as np
+
+        with open(calc_comp_path) as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=',')
+            self.calc_weight = np.array(list(csv_reader)[1], dtype=float)
+            print(self.calc_weight)
+
+        print('-' * 60)
+        print('Start Loading Model...')
+
+        self.model_x = joblib.load(model_path_x)
+        self.model_y = joblib.load(model_path_y)
+
+        print(self.model_x.get_params())
+        print(self.model_y.get_params())
+        print("\nLoad model successfully!")
+
+    def predict(self, features):
+        if features is None:
+            return None
+
+        components = self.calc_weight.dot(features).reshape(-1, 1)
+        x = self.model_x.predict(components)[0]
+        y = self.model_y.predict(components)[0]
+
+        return (x, y)
+
 
 class MlrmMapping:
     def __init__(self, model_path_x, model_path_y):

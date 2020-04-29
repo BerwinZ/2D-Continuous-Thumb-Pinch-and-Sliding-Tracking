@@ -1,5 +1,5 @@
 """
-Track the finger motion with random forest regression model
+Track the finger motion with knn regression model
 """
 
 if __name__ == '__main__':
@@ -11,7 +11,7 @@ if __name__ == '__main__':
     import picamera_control
     from image_segment import threshold_masking
     from feature_extraction import extract_features
-    from feature_mapping import MlrmMapping
+    from feature_mapping import MknnMapping
     import draw_tools as dtl
     from math_tools import KalmanFilter
 
@@ -31,11 +31,11 @@ if __name__ == '__main__':
         hor_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
         ver_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
     
-        # model_path1 = "./models/large_models/0_862_RandomForestRegressor.joblib"
-        path1 = "./models/large_models_2/0_89_RandomForestRegressor_x.joblib"
-        path2 = "./models/large_models_2/0_926_RandomForestRegressor_y.joblib"
+        calc_com_path = "./models/knn/calc_components.csv"
+        path1 = "./models/knn/knn_x.joblib"
+        path2 = "./models/knn/knn_y.joblib"
 
-        model = MlrmMapping(path1, path2)
+        model = MknnMapping(calc_com_path, path1, path2)
 
         kalman = KalmanFilter()
 
@@ -63,6 +63,7 @@ if __name__ == '__main__':
             # 1.3 Map features
             # ---------------------------------------------
             coord = model.predict(features)
+            # print(coord)
 
             if SHOW_IMAGE:
                 cv2.imshow('Finger', out_image)
@@ -74,7 +75,7 @@ if __name__ == '__main__':
                 coord = kalman.predict(coord)
             else:
                 coord = kalman.predict((0, 0))
-            hv_board.update_dot(coord, scaler=[3, 3])
+            hv_board.update_dot(coord, scaler=[10, 10])
             cv2.imshow('Drawboard', hv_board.board)
 
 
