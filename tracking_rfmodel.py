@@ -10,13 +10,13 @@ if __name__ == '__main__':
     import numpy as np
     from time import sleep
     import sys, traceback
+
     import picamera_control
     from image_segment import threshold_masking
     from feature_extraction import extract_features
     from feature_mapping import MlrmMapping
-    from draw_tools import DrawBoard
-    from math_tools import configure_kalman_filter
-    # from sklearn.multioutput import MultiOutputRegressor
+    import draw_tools as dtl
+    from math_tools import KalmanFilter
 
     try:
         print('Initializing...')
@@ -29,10 +29,10 @@ if __name__ == '__main__':
         SHOW_IMAGE = True
 
         # Drawing boards
-        # DR_WIDTH, DR_HEIGHT = 320, 320
-        # hv_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
-        # hor_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
-        # ver_board = DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        DR_WIDTH, DR_HEIGHT = 300, 300
+        hv_board  = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
+        hor_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        ver_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
     
         # model_path1 = "./models/large_models/0_862_RandomForestRegressor.joblib"
         path1 = "./models/large_models_2/0_89_RandomForestRegressor_x.joblib"
@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
         model = MlrmMapping(path1, path2)
 
-        kalman_filter = configure_kalman_filter()
+        kalman = KalmanFilter()
 
         print('-' * 60)
         print("Press A to turn ON/OFF the finger image")
@@ -50,12 +50,12 @@ if __name__ == '__main__':
                                                format="bgr",
                                                use_video_port=True):
             bgr_image = frame.array
-            out_image = bgr_image.copy()
 
             # ---------------------------------------------
             # 1.1 Get the mask and its contour and apply the mask to image
             # ---------------------------------------------
             mask, contour, finger_image = threshold_masking(bgr_image)
+            out_image = finger_image.copy()
 
             # ---------------------------------------------
             # 1.2 Extract features
@@ -67,19 +67,18 @@ if __name__ == '__main__':
             # ---------------------------------------------
             coord = model.predict(features)
 
-            if coord is not None:
-                kalman_filter.correct(np.float32(coord))
-                filter_ans = kalman_filter.predict()
-                filtered_coord = np.array((int(filter_ans[0]), int(filter_ans[1])))
-                print(filtered_coord)
-
-            # DRAW_SCALER = 5
-            # hv_board.update_dot(filtered_coord * DRAW_SCALER)
-
             if SHOW_IMAGE:
                 cv2.imshow('Finger', out_image)
 
-            # cv2.imshow('Board', hv_board.board)
+            # ---------------------------------------------
+            # 2. Application
+            # ---------------------------------------------
+            if coord is not None:
+                coord = kalman.predict(coord)
+            else:
+                coord = kalman.predict((0, 0))
+            hv_board.update_dot(coord, scaler=[3, 3])
+            cv2.imshow('Drawboard', hv_board.board)
 
 
             # ---------------------------------------------

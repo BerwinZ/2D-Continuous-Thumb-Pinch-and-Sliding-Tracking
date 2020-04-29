@@ -40,7 +40,6 @@ if __name__ == '__main__':
         kalman = KalmanFilter()
 
         # Drawing boards
-        DRAW_SCALER = 50
         DR_WIDTH, DR_HEIGHT = 300, 300
         hv_board  = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
         hor_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
