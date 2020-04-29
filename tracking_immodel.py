@@ -14,6 +14,7 @@ if __name__ == '__main__':
     from feature_extraction import extract_features
     from feature_mapping import ImmMapping
 
+    from math_tools import KalmanFilter
     import draw_tools as dtl
     from opt_flow_LK import OpticalFlowLK
 
@@ -36,12 +37,14 @@ if __name__ == '__main__':
         # Tracker to convert point movement in image coordinate to the draw board coordinate
         # tracker = GeometryCalculator()
 
+        kalman = KalmanFilter()
+
         # Drawing boards
         DRAW_SCALER = 50
-        DR_WIDTH, DR_HEIGHT = 320, 320
-        # hv_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
-        # hor_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
-        # ver_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        DR_WIDTH, DR_HEIGHT = 300, 300
+        hv_board  = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
+        hor_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        ver_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
 
         model = ImmMapping()
 
@@ -56,12 +59,12 @@ if __name__ == '__main__':
                                                format="bgr",
                                                use_video_port=True):
             bgr_image = frame.array
-            out_image = bgr_image.copy()
 
             # ---------------------------------------------
             # 1.1 Get the mask and its contour and apply the mask to image
             # ---------------------------------------------
             mask, contour, finger_image = threshold_masking(bgr_image)
+            out_image = finger_image.copy()
 
             # ---------------------------------------------
             # 1.2 Extract features
@@ -71,9 +74,10 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 1.3 Feature Mapping
             # ---------------------------------------------
+            coord = None
             if features is not None:
                 coord = model.predict(features[-2], features[-3])
-                # print(coord)
+                print(coord)
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -86,7 +90,12 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2. Application
             # ---------------------------------------------
-
+            if coord is not None:
+                coord = kalman.predict(coord)
+            else:
+                coord = kalman.predict((0, 0))
+            hv_board.update_dot(coord, scaler=[3, 3])
+            cv2.imshow('Drawboard', hv_board.board)
 
             # ---------------------------------------------
             # 3. User Input
@@ -98,11 +107,10 @@ if __name__ == '__main__':
             elif keypress == ord('c'):
                 if features is not None:
                     model.calibrate(features[-2], features[-3])
-                # tracker.calibrate_touch_scale(up_touch_line, up_centroid,
-                #                               touch_point)
-                # hv_board.reset_board()
-                # hor_board.reset_board()
-                # ver_board.reset_board()
+            elif keypress == ord('r'):
+                hv_board.reset_board()
+                hor_board.reset_board()
+                ver_board.reset_board()
             elif keypress == ord('s'):
                 cv2.imwrite('screenshot.jpg', finger_image)
             elif keypress == ord('a'):

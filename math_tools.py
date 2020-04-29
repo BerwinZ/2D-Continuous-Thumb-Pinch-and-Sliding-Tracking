@@ -115,6 +115,27 @@ def get_circle(p1, p2, p3):
 
     return center
 
+class KalmanFilter:
+    def __init__(self):
+        self.kalman = configure_kalman_filter()
+
+    def predict(self, pt):
+        """Use pt to update the kalman filter and return the predicted value
+
+        Arguments:
+            pt {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
+        self.kalman.correct(
+            np.array([[np.float32(pt[0])],
+                      [np.float32(pt[1])]]))
+        predict_pt = self.kalman.predict()
+        filterd_pt = (int(predict_pt[0]), int(predict_pt[1]))
+        return filterd_pt
+
+
 def configure_kalman_filter():
     """Configure the kalman filter
 

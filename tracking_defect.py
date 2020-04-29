@@ -146,9 +146,9 @@ if __name__ == '__main__':
             if dx is not None:
                 dx = -dx * DRAW_SCALER
                 dy = dy * DRAW_SCALER
-            hor_board.draw_filled_point((dx, 0))
-            ver_board.draw_filled_point((0, dy))
-            hv_board.draw_filled_point((dx, dy))
+            hor_board.update_dot((dx, 0))
+            ver_board.update_dot((0, dy))
+            hv_board.update_dot((dx, dy))
 
             # Display
             H_V_joint = np.concatenate(

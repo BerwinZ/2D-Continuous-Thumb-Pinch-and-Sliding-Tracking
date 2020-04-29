@@ -91,12 +91,11 @@ class ImmMapping:
 
     def __pixel_to_coord_x(self, xgim):
         self.beta = self.__func_h_inv(kppi * xgim) 
-        print(kppi * xgim, degs(self.beta))
-        return (d1 * sin(aph0 - self.aph1) + d2 * sin(aph0)) * self.beta
+        # print(kppi * xgim, degs(self.beta))
+        return - (d1 * sin(aph0 - self.aph1) + d2 * sin(aph0)) * self.beta
 
     def __pixel_to_coord_y(self, ybim):
-        k = 4
-        self.aph1 = self.__func_g_inv(k * kppi * ybim)
+        self.aph1 = self.__func_g_inv(kppi * ybim)
         # print('b=', k * kppi * ybim, 'deg=', degs(self.aph1))
         return d1 * (self.aph1 - self.aph1_0)
 

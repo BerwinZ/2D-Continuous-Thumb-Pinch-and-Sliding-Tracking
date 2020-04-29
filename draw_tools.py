@@ -91,16 +91,16 @@ class DrawBoard:
         self.height = HEIGHT
         self.radius = RADIUS
         self.board = np.zeros((HEIGHT, WIDTH, 3))
-        self.points = []
+        self.pts_queue = []
         self.max_points = MAX_POINTS
 
     def reset_board(self):
         """Reset the board to all 0 array
         """
         self.board = self.board * 0
-        self.points = []
+        self.pts_queue = []
 
-    def draw_filled_point(self, point, middle=True, color=[255, 0, 0]):
+    def update_dot(self, point, middle=True, scaler=[1, 1], color=[255, 0, 0]):
         """Draw points on the board
         
         Arguments:
@@ -110,28 +110,29 @@ class DrawBoard:
             middle {bool} -- [description] (default: {True})
             color {list} -- [description] (default: {[255, 0, 0]})
         """
-        if point[0] is None or point[1] is None:
-            self.points.append(None)
+        if point is None or point[0] is None or point[1] is None:
+            self.pts_queue.append(None)
         else:
             if middle:
-                new_point = (int(point[0] + self.width / 2),
-                             int(point[1] + self.height / 2))
+                new_point = (int(point[0] * scaler[0] + self.width / 2),
+                             int(point[1] * scaler[1] + self.height / 2))
             else:
                 new_point = tuple(point)
-            self.points.append(new_point)
 
-        if len(self.points) > self.max_points:
-            if self._IsValid(self.points[0]):
-                cv2.circle(self.board, self.points[0], self.radius, [0, 0, 0],
+            self.pts_queue.append(new_point)
+
+        if len(self.pts_queue) > self.max_points:
+            if self._IsValid(self.pts_queue[0]):
+                cv2.circle(self.board, self.pts_queue[0], self.radius, [0, 0, 0],
                            -1)
-            self.points.pop(0)
-            for p in self.points:
+            self.pts_queue.pop(0)
+            for p in self.pts_queue:
                 if self._IsValid(p):
                     cv2.circle(self.board, p, self.radius, [209, 206, 0], -1)
-            if self._IsValid(self.points[-1]):
+            if self._IsValid(self.pts_queue[-1]):
                 cv2.circle(self.board, p, self.radius, color, -1)
         else:
-            if self._IsValid(self.points[-1]):
+            if self._IsValid(self.pts_queue[-1]):
                 cv2.circle(self.board, new_point, self.radius, color, -1)
 
     def _IsValid(self, point):
@@ -143,8 +144,8 @@ if __name__ == '__main__':
     """Test the DrawBoard class
     """
     board = DrawBoard()
-    board.draw_filled_point((0, 0), color=[255, 0, 0])
-    board.draw_filled_point((100, 0), color=[0, 255, 0])
+    board.update_dot((0, 0), color=[255, 0, 0])
+    board.update_dot((100, 0), color=[0, 255, 0])
     cv2.imshow("Board", board.board)
     cv2.waitKey(0)
     cv2.destroyAllWindows()

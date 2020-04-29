@@ -105,8 +105,8 @@ def extract_features(contour, im_height, im_width, output_image=None):
         draw_points(output_image, top_right, radius=10, color=[255, 255, 0])
         draw_points(output_image, bottom_left, radius=10, color=[255, 255, 0])
         draw_points(output_image, bottom_right, radius=10, color=[255, 255, 0])
-        draw_points(output_image, lowest_thumb, color=[0, 255, 255])
-        draw_points(output_image, rightest_index, color=[0, 255, 255])
+        draw_points(output_image, lowest_thumb, radius=10, color=[0, 255, 255])
+        draw_points(output_image, rightest_index, radius=10, color=[0, 255, 255])
     
     return features
 

@@ -74,7 +74,7 @@ if __name__ == '__main__':
                 print(filtered_coord)
 
             # DRAW_SCALER = 5
-            # hv_board.draw_filled_point(filtered_coord * DRAW_SCALER)
+            # hv_board.update_dot(filtered_coord * DRAW_SCALER)
 
             if SHOW_IMAGE:
                 cv2.imshow('Finger', out_image)
