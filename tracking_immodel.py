@@ -76,7 +76,8 @@ if __name__ == '__main__':
             coord = None
             if features is not None:
                 coord = model.predict(features[-2], features[-3])
-                print(coord)
+                # coord = model.predict(features[6] * 2, features[5] * 2)
+                # print(coord)
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -93,7 +94,8 @@ if __name__ == '__main__':
                 coord = kalman.predict(coord)
             else:
                 coord = kalman.predict((0, 0))
-            hv_board.update_dot(coord, scaler=[3, 3])
+            # make the y scale larger
+            hv_board.update_dot(coord, scaler=[3, 9])
             cv2.imshow('Drawboard', hv_board.board)
 
             # ---------------------------------------------

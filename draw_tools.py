@@ -115,9 +115,9 @@ class DrawBoard:
         else:
             if middle:
                 new_point = (int(point[0] * scaler[0] + self.width / 2),
-                             int(point[1] * scaler[1] + self.height / 2))
+                             int(-point[1] * scaler[1] + self.height / 2))
             else:
-                new_point = tuple(point)
+                new_point = tuple((int)(point[0]), -(int)(point[1]))
 
             self.pts_queue.append(new_point)
 

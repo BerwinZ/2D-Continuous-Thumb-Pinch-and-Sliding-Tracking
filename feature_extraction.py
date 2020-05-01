@@ -32,7 +32,7 @@ def extract_features(contour, im_height, im_width, output_image=None):
         output_image {[type]} -- [description] (default: {None})
 
     Returns:
-        array -- 1 * 20 array
+        array {1 * 20 array} -- left defect points, right defect points, thumb_centroid, index_centroid, top_left, top_right, bottom_left, bottom_right, lowest_thumb, rightest_index
     """
     # ---------------------------------------------
     # 1.1 Get 2 defect points
