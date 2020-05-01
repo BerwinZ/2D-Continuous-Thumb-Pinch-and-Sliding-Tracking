@@ -151,10 +151,18 @@ class ImmMapping:
         pt_a5[0] = (tan(aph0-aph1-theta4) * pt_a4[0] - tan(aph0-aph1) * pt_a3[0] - pt_a4[1] + pt_a3[1]) / base_a5
         pt_a5[1] = (tan(aph0-aph1-theta4) * tan(aph0-aph1) * (pt_a4[0]-pt_a3[0]) + tan(aph0-aph1-theta4) * pt_a3[1] - tan(aph0 - aph1) * pt_a4[1]) / base_a5
 
-        pt_c[0] = (tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2))
-        pt_c[1] = -(tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)) * cot(av / 2)
-
-        func_L = lambda t: ((1-t) ** 2 * pt_c[1] + 2 * t * (1-t) * pt_a5[1] + t * t * pt_a4[1]) / ((1-t) ** 2 * pt_c[0] + 2 * t * (1-t) * pt_a5[0] + t * t * pt_a4[0])
+        curve_slope = lambda p1, p2, p3, t: \
+                        ((1-t)**2 * p1[1] + 2*t*(1-t) * p2[1] + t*t * p3[1]) / \
+                        ((1-t)**2 * p1[0] + 2*t*(1-t) * p2[0] + t*t * p3[0])
+        #------------------------------------------------------------------------
+        # Method 1
+        # pt_c[0] = (tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2))
+        # pt_c[1] = -(tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)) * cot(av / 2)
+        # func_L = lambda t: curve_slope(pt_c, pt_a5, pt_a4, t) 
+        #------------------------------------------------------------------------
+        # Method 2
+        func_L = lambda t: curve_slope(pt_a3, pt_a5, pt_a4, t)
+        #------------------------------------------------------------------------
 
         t_list = np.arange(0, 1, 0.1)
         L_t_list = func_L(t_list)
