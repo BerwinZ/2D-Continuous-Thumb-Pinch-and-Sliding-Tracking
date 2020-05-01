@@ -40,10 +40,8 @@ if __name__ == '__main__':
         kalman = KalmanFilter()
 
         # Drawing boards
-        DR_WIDTH, DR_HEIGHT = 300, 300
-        hv_board  = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=5)
-        hor_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
-        ver_board = dtl.DrawBoard(DR_WIDTH, DR_HEIGHT, RADIUS=10, MAX_POINTS=1)
+        DR_SIZE = 500
+        hv_board = dtl.DrawBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=10)
 
         model = ImmMapping()
 
@@ -95,7 +93,7 @@ if __name__ == '__main__':
             else:
                 coord = kalman.predict((0, 0))
             # make the y scale larger
-            hv_board.update_dot(coord, scaler=[3, 9])
+            hv_board.update_dot(coord, scaler=[4 * 1.6, 9 * 1.6])
             cv2.imshow('Drawboard', hv_board.board)
 
             # ---------------------------------------------

@@ -18,7 +18,7 @@ It also includes several functions which can be used indepently
 
 import numpy as np
 import cv2
-from draw_tools import draw_points
+import draw_tools as dtl
 
 def extract_features(contour, im_height, im_width, output_image=None):
     """Extract features
@@ -97,16 +97,18 @@ def extract_features(contour, im_height, im_width, output_image=None):
     # 1.6 If show the points
     # ---------------------------------------------
     if output_image is not None:
+        # dtl.draw_contours(output_image, thumb_cnt, color=[255, 0, 0])
+        # dtl.draw_contours(output_image, index_cnt, color=[0, 0, 255])
         # Two defect points (Green), centroid points (Blue), boundary points (Green-blue)
-        draw_points(output_image, dft_pts, color=[0, 255, 0])
-        draw_points(output_image, thumb_cent, color=[255, 0, 0])
-        draw_points(output_image, index_cent, color=[255, 0, 0])
-        draw_points(output_image, top_left, radius=10, color=[255, 255, 0])
-        draw_points(output_image, top_right, radius=10, color=[255, 255, 0])
-        draw_points(output_image, bottom_left, radius=10, color=[255, 255, 0])
-        draw_points(output_image, bottom_right, radius=10, color=[255, 255, 0])
-        draw_points(output_image, lowest_thumb, radius=10, color=[0, 255, 255])
-        draw_points(output_image, rightest_index, radius=10, color=[0, 255, 255])
+        dtl.draw_points(output_image, dft_pts, color=[0, 255, 0])
+        dtl.draw_points(output_image, thumb_cent, color=[255, 0, 0])
+        dtl.draw_points(output_image, index_cent, color=[255, 0, 0])
+        dtl.draw_points(output_image, top_left, color=[255, 255, 0])
+        dtl.draw_points(output_image, top_right, color=[255, 255, 0])
+        dtl.draw_points(output_image, bottom_left, color=[255, 255, 0])
+        dtl.draw_points(output_image, bottom_right, color=[255, 255, 0])
+        dtl.draw_points(output_image, lowest_thumb, radius=10, color=[0, 255, 255])
+        dtl.draw_points(output_image, rightest_index, radius=10, color=[0, 255, 255])
     
     return features
 
@@ -158,31 +160,29 @@ def segment_diff_fingers(contour, defect_points):
     """Segment the contour to the up finger and down finger
 
     Arguments:
-        contour {[type]} -- [description]
-        defect_points {[type]} -- [description]
-        touch_points {[type]} -- [description]
+        contour {[type]} -- ((m+n) * 1 * 2) array
+        defect_points {[type]} -- left and right defect points
 
     Returns:
-        [type] -- [description]
+        thumb contour -- (m * 1 * 2) array
+        index finger contour -- (n * 1 * 2) array
     """
     if contour is None or defect_points is None:
         return None, None
 
-    (x1, y1), (x2, y2) = defect_points
+    d1 = np.linalg.norm(contour[:, 0, :] - np.array(defect_points[0]),
+                        axis=1)
+    d2 = np.linalg.norm(contour[:, 0, :] - np.array(defect_points[1]),
+                        axis=1)
 
-    # TODO: some error here, 179938 image in step=2 dataset
-    if abs(x2 - x1) < 1e-6:
-        up_finger = contour[contour[:, 0, 0] <= x1]
-        down_finger = contour[contour[:, 0, 0] >= x1]
-    else:
-        grad_direc = (y2 - y1) / (x2 - x1)
-        segment_line = lambda x, y: grad_direc * (x - x1) - (y - y1)
-        up_finger = contour[segment_line(contour[:, 0, 0], contour[:, 0,
-                                                                   1]) >= 0]
-        down_finger = contour[segment_line(contour[:, 0, 0], contour[:, 0,
-                                                                     1]) <= 0]
+    idx_left = np.where(d1 == min(d1))[0][0]
+    idx_right = np.where(d2 == min(d2))[0][0]
 
-    return up_finger, down_finger
+    thumb_cnt = np.concatenate((contour[:idx_left+1],
+                                contour[idx_right:]))
+    index_cnt = contour[idx_left:idx_right+1]
+
+    return thumb_cnt, index_cnt
 
 
 def add_touch_line_to_contour(is_up, contour, defect_points, touch_line):
@@ -375,8 +375,8 @@ def get_touch_line_curve(IS_UP,
     if draw_image is not None:
         # Draw the points used to fit
         color = [0, 0, 255] if IS_UP else [255, 0, 0]
-        draw_points(draw_image, contour.astype("int"), radius=3, color=color)
-        draw_points(draw_image, points, radius=3, color=color)
+        dtl.draw_points(draw_image, contour.astype("int"), radius=3, color=color)
+        dtl.draw_points(draw_image, points, radius=3, color=color)
 
     return curve, theta, points
 
@@ -420,3 +420,48 @@ def get_special_pt(contour, touch_pts, mode='lowest'):
 
     return pt
 
+if __name__ == '__main__':
+    import cv2
+    import numpy as np
+    from time import sleep
+    import sys, traceback
+
+    import picamera_control
+    from image_segment import threshold_masking
+
+    try:
+        IM_WIDTH, IM_HEIGHT = 640, 480
+        # Note: Higher framerate will bring noise to the segmented image
+        camera, rawCapture = picamera_control.configure_camera(IM_WIDTH,
+                                                               IM_HEIGHT,
+                                                               FRAME_RATE=40)
+
+        for frame in camera.capture_continuous(rawCapture,
+                                               format="bgr",
+                                               use_video_port=True):
+            bgr_image = frame.array
+            out_image = bgr_image.copy()
+
+            mask, contour, finger_image = threshold_masking(bgr_image)
+
+            features = extract_features(contour, IM_HEIGHT, IM_WIDTH, out_image)
+
+            cv2.imshow('Finger', out_image)
+
+            keypress = cv2.waitKey(1) & 0xFF
+            if keypress == 27:
+                break
+            elif keypress == ord('s'):
+                cv2.imwrite('screenshot.jpg', finger_image)
+
+            rawCapture.truncate(0)
+
+        camera.close()
+        cv2.destroyAllWindows()
+    except Exception as e:
+        camera.close()
+        cv2.destroyAllWindows()
+        print("Exception in user code:")
+        print('-' * 60)
+        traceback.print_exc(file=sys.stdout)
+        print('-' * 60)

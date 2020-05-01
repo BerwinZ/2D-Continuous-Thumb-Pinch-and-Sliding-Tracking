@@ -74,7 +74,8 @@ if __name__ == '__main__':
                 coord = kalman.predict(coord)
             else:
                 coord = kalman.predict((0, 0))
-            hv_board.update_dot(coord, scaler=[3, 3])
+
+            hv_board.update_dot(coord, scaler=[3, 9])
             cv2.imshow('Drawboard', hv_board.board)
 
 
