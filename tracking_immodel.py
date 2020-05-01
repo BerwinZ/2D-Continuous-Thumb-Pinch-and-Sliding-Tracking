@@ -100,6 +100,7 @@ if __name__ == '__main__':
             # 3. User Input
             # ---------------------------------------------
             # if the user pressed ESC, then stop looping
+            # TODO: consider change to 25 ms
             keypress = cv2.waitKey(1) & 0xFF
             if keypress == 27:
                 break

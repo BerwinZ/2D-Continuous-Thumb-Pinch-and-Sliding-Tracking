@@ -2,18 +2,22 @@
 This script provide methods to extract the features from the images. The extractions are based on the contour of the fingers.
 
 It also includes several functions which can be used indepently
-1. get_defect_points
+1. extract_features
+    extract all 10 features 
+2. get_defect_points
     Get left and right defect points from contour
-2. segment_diff_fingers
+3. segment_diff_fingers
     Segment whole contour into up and down contours according to defect points
-3. add_touch_line_to_contour
+4. add_touch_line_to_contour
     Add touch line points to the contour
-4. get_boundary_points
+5. get_boundary_points
     Get 4 boundary points of the up and down contour 
-5. get_centroid
+6. get_centroid
     Get the centroid of a boundary
-6. get_touch_line_curve
-    Get touch line curve
+7. get_touch_line_curve
+    Get touch line curve and curve points
+8. get_special_pt
+    Get the lowest thumb, rightest index finger points 
 """
 
 import numpy as np

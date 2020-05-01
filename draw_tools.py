@@ -8,6 +8,10 @@ Drawing tools collections
 
 import cv2
 import numpy as np
+import random
+from time import sleep
+import threading
+import timeit
 
 
 def draw_vertical_lines(img, line_num=0):
@@ -100,7 +104,7 @@ class DrawBoard:
         self.board = self.board * 0
         self.pts_queue = []
 
-    def update_dot(self, point, middle=True, scaler=[1, 1], color=[255, 0, 0]):
+    def update_dot(self, point, middle=True, scaler=[1, 1]):
         """Draw points on the board
         
         Arguments:
@@ -108,7 +112,7 @@ class DrawBoard:
         
         Keyword Arguments:
             middle {bool} -- [description] (default: {True})
-            color {list} -- [description] (default: {[255, 0, 0]})
+            scaler {list} -- [scaler of x and y] (default: [1, 1])
         """
         if point is None or point[0] is None or point[1] is None:
             self.pts_queue.append(None)
@@ -117,35 +121,136 @@ class DrawBoard:
                 new_point = (int(point[0] * scaler[0] + self.width / 2),
                              int(-point[1] * scaler[1] + self.height / 2))
             else:
-                new_point = tuple((int)(point[0]), -(int)(point[1]))
+                new_point = (int(point[0]), int(point[1]))
 
             self.pts_queue.append(new_point)
 
         if len(self.pts_queue) > self.max_points:
-            if self._IsValid(self.pts_queue[0]):
-                cv2.circle(self.board, self.pts_queue[0], self.radius, [0, 0, 0],
-                           -1)
-            self.pts_queue.pop(0)
-            for p in self.pts_queue:
-                if self._IsValid(p):
-                    cv2.circle(self.board, p, self.radius, [209, 206, 0], -1)
-            if self._IsValid(self.pts_queue[-1]):
-                cv2.circle(self.board, p, self.radius, color, -1)
-        else:
-            if self._IsValid(self.pts_queue[-1]):
-                cv2.circle(self.board, new_point, self.radius, color, -1)
-
-    def _IsValid(self, point):
+            pt = self.pts_queue.pop(0)
+            if self.__IsValid(pt):
+                cv2.circle(self.board, pt, self.radius, [0, 0, 0], -1)
+            
+        for idx in range(len(self.pts_queue)):
+            pt = self.pts_queue[idx]
+            if self.__IsValid(pt):
+                if idx == len(self.pts_queue) - 1:
+                    cv2.circle(self.board, pt, self.radius, [255, 0, 0], -1)
+                else:
+                    cv2.circle(self.board, pt, self.radius, [209, 206, 0], -1)            
+        
+    def __IsValid(self, point):
         return point is not None and 0 <= point[0] < self.width and 0 <= point[
             1] < self.height
 
 
+class TargetDotBoard:
+    def __init__(self, WIDTH=480, HEIGHT=480, RADIUS=10, MAX_POINTS=10):
+        self.drawboard = DrawBoard(WIDTH, HEIGHT, RADIUS, MAX_POINTS)
+        self.board = self.drawboard.board
+        self.width = WIDTH
+        self.height = HEIGHT
+
+        self.cur_pos = None
+
+        self.target_radius = 20
+        self.target_count = 10
+        self.target_pos = None
+        
+        self.thread_sign = True
+        
+        self.task_cost_time = []
+        
+    def update_dot(self, point, middle=True, scaler=[1, 1]):
+        if self.target_pos != None:
+             cv2.circle(self.drawboard.board, self.target_pos, self.target_radius, [0, 255, 255], -1)
+        
+        self.cur_pos = point
+        self.drawboard.update_dot(point, middle, scaler)
+        self.board = self.drawboard.board
+
+    def start(self):
+        self.thread_sign = True
+        threading.Thread(target=self.__task).start()
+    
+    def stop(self):
+        self.thread_sign = False
+
+    def __task(self):
+        while self.target_count > 0 and self.thread_sign:
+            # generate new target pos
+            if self.target_pos is not None:
+                cv2.circle(self.drawboard.board, self.target_pos, self.target_radius, [0, 0, 0], -1)
+            self.target_count = self.target_count - 1
+            self.target_pos = self.__generate_target_dot()
+
+            # draw the target pos
+            cv2.circle(self.drawboard.board, self.target_pos, self.target_radius, [0, 255, 255], -1)
+            self.board = self.drawboard.board
+
+            # check current dot position
+            arrived = False
+
+            # wait 3 seconds
+            print('\n')
+            print('-'*60)
+            print("Target Dot Changed!")
+            start_time = timeit.default_timer()
+            countdown = 3
+            while countdown > 0 and self.thread_sign:
+                print("Countdown:", countdown)
+                countdown -= 1
+                for i in range(1000):
+                    if not arrived and self.__check_arrive():
+                        print("Arrive!")
+                        arrived = True
+                        stop_time = timeit.default_timer()
+                    sleep(1e-3)
+            print("Countdown:", 0)
+
+            # show result
+            print('-'*60)
+            if not arrived:
+                print("Not arrived")
+                self.task_cost_time.append(None)
+            else:
+                cost_time = round(stop_time-start_time,2)
+                print("Arrive in", cost_time, 'seconds')
+                self.task_cost_time.append(cost_time)
+            
+            sleep(1)
+        
+        print("Task finished. Cost time is")
+        print(self.task_cost_time)
+
+    def __generate_target_dot(self, offset = 50):
+        x = random.randint(0 + offset, self.width - 1 - offset)
+        y = random.randint(0 + offset, self.height - 1 - offset)
+        return x, y
+
+    def __check_arrive(self):
+        if self.cur_pos is None or self.target_pos is None:
+            return False
+        
+        return np.sqrt(
+        (self.cur_pos[0] - self.target_pos[0])** 2 + (self.cur_pos[1]-self.target_pos[1])**2) < self.target_radius
+
 if __name__ == '__main__':
     """Test the DrawBoard class
     """
-    board = DrawBoard()
-    board.update_dot((0, 0), color=[255, 0, 0])
-    board.update_dot((100, 0), color=[0, 255, 0])
+    board = TargetDotBoard()
+    def draw_f(event, x, y, flags, param):
+        board.update_dot((x, y), middle=False)
+
     cv2.imshow("Board", board.board)
-    cv2.waitKey(0)
+    cv2.setMouseCallback("Board", draw_f)
+    while True:
+        cv2.imshow("Board", board.board)
+            
+        keypress = cv2.waitKey(25) & 0xFF
+        if keypress == 27:
+            break
+        elif keypress == ord('s'):
+            board.start()
+
     cv2.destroyAllWindows()
+    board.stop()
