@@ -41,7 +41,8 @@ if __name__ == '__main__':
 
         # Drawing boards
         DR_SIZE = 500
-        hv_board = dtl.DrawBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=10)
+        # board = dtl.DrawBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=10)
+        board = dtl.TargetDotBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=10)
 
         model = ImmMapping()
 
@@ -49,7 +50,7 @@ if __name__ == '__main__':
         print(
             "To calibrate, press 'C'"
         )
-        print("Press A to turn ON/OFF the finger image")
+        print("To turn ON/OFF the finger image, press 'A'")
         print('-' * 60)
 
         for frame in camera.capture_continuous(rawCapture,
@@ -69,13 +70,15 @@ if __name__ == '__main__':
             features = extract_features(contour, IM_HEIGHT, IM_WIDTH, out_image)
 
             # ---------------------------------------------
-            # 1.3 Feature Mapping
+            # 1.3 Feature Mapping and kalman filter
             # ---------------------------------------------
-            coord = None
             if features is not None:
                 coord = model.predict(features[-2], features[-3])
                 # coord = model.predict(features[6] * 2, features[5] * 2)
                 # print(coord)
+                coord = kalman.predict(coord)
+            else:
+                coord = kalman.predict((0, 0))
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -88,19 +91,14 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2. Application
             # ---------------------------------------------
-            if coord is not None:
-                coord = kalman.predict(coord)
-            else:
-                coord = kalman.predict((0, 0))
-            # make the y scale larger
-            hv_board.update_dot(coord, scaler=[4 * 1.6, 9 * 1.6])
-            cv2.imshow('Drawboard', hv_board.board)
+            # make the y scale larger, size: 300 - [4, 9]
+            board.update_dot(coord, scaler=[5 * 1.6, 9 * 1.6])
+            cv2.imshow('Drawboard', board.board)
 
             # ---------------------------------------------
             # 3. User Input
             # ---------------------------------------------
             # if the user pressed ESC, then stop looping
-            # TODO: consider change to 25 ms
             keypress = cv2.waitKey(1) & 0xFF
             if keypress == 27:
                 break
@@ -108,11 +106,12 @@ if __name__ == '__main__':
                 if features is not None:
                     model.calibrate(features[-2], features[-3])
             elif keypress == ord('r'):
-                hv_board.reset_board()
+                board.reset_board()
                 hor_board.reset_board()
                 ver_board.reset_board()
             elif keypress == ord('s'):
-                cv2.imwrite('screenshot.jpg', finger_image)
+                # cv2.imwrite('screenshot.jpg', finger_image)
+                board.start()
             elif keypress == ord('a'):
                 if SHOW_IMAGE:
                     cv2.destroyWindow("Finger")
@@ -122,9 +121,11 @@ if __name__ == '__main__':
 
         camera.close()
         cv2.destroyAllWindows()
+        board.stop()
     except Exception as e:
         camera.close()
         cv2.destroyAllWindows()
+        board.stop()
         print("Exception in user code:")
         print('-' * 60)
         traceback.print_exc(file=sys.stdout)

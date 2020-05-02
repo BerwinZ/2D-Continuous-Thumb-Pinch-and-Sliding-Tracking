@@ -164,7 +164,12 @@ class TargetDotBoard:
         if self.target_pos != None:
              cv2.circle(self.drawboard.board, self.target_pos, self.target_radius, [0, 255, 255], -1)
         
-        self.cur_pos = point
+        if middle:
+            self.cur_pos = (int(point[0] * scaler[0] + self.width / 2),
+                            int(-point[1] * scaler[1] + self.height / 2))
+        else:
+            self.cur_pos = (int(point[0]), int(point[1]))
+
         self.drawboard.update_dot(point, middle, scaler)
         self.board = self.drawboard.board
 
@@ -195,7 +200,7 @@ class TargetDotBoard:
             print('-'*60)
             print("Target Dot Changed!")
             start_time = timeit.default_timer()
-            countdown = 3
+            countdown = 5
             while countdown > 0 and self.thread_sign:
                 print("Countdown:", countdown)
                 countdown -= 1
@@ -222,7 +227,7 @@ class TargetDotBoard:
         print("Task finished. Cost time is")
         print(self.task_cost_time)
 
-    def __generate_target_dot(self, offset = 50):
+    def __generate_target_dot(self, offset = 100):
         x = random.randint(0 + offset, self.width - 1 - offset)
         y = random.randint(0 + offset, self.height - 1 - offset)
         return x, y
