@@ -66,7 +66,7 @@ def extract_features(contour, im_height, im_width, output_image=None):
         IS_UP=True,
         contour=thumb_cnt,
         bound_points=(top_left, top_right),
-        fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 4)),
+        fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 2)),
         defect_points=dft_pts)
 
     _, _, index_touch_pts = get_touch_line_curve(
@@ -76,8 +76,8 @@ def extract_features(contour, im_height, im_width, output_image=None):
         fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 3)),
         defect_points=dft_pts)
 
-    lowest_thumb   = get_special_pt(thumb_cnt, thumb_touch_pts, 'lowest')
-    rightest_index = get_special_pt(index_cnt, index_touch_pts, 'rightest')
+    lowest_thumb   = get_special_pt(thumb_cnt, thumb_touch_pts, im_width, 'lowest')
+    rightest_index = get_special_pt(index_cnt, index_touch_pts, im_width, 'rightest')
 
     # ---------------------------------------------
     # 1.5 Check None and form the feature data
@@ -390,7 +390,7 @@ mode_dict = {'lowest': [1, max],
              'leftest':[0, min],
              'rightest':[0, max]}
 
-def get_special_pt(contour, touch_pts, mode='lowest'):
+def get_special_pt(contour, touch_pts, im_width, mode='lowest'):
     """Return the special point
 
     Arguments:
@@ -414,13 +414,22 @@ def get_special_pt(contour, touch_pts, mode='lowest'):
     pt = None
     basis, f = mode_dict[mode]
 
-    index = np.where(contour[:, basis] == f(contour[:, basis]))[0][0]
-    p1 = tuple(contour[index])
+    if mode == 'rightest':
+        index = np.where(contour[:, basis] == f(contour[:, basis]))[0]
+        bo = tuple(contour[index[0] ])
+        up = tuple(contour[index[-1]])
+        if up[0] == im_width - 1:
+            pt = (up[0] + bo[1] - up[1], (bo[1] + up[1]) // 2)
+        else:
+            pt = (up[0], (bo[1] + up[1]) // 2)
+    elif mode == 'lowest':
+        index = np.where(contour[:, basis] == f(contour[:, basis]))[0][0]
+        p1 = tuple(contour[index])
 
-    index = np.where(touch_pts[:, basis] == f(touch_pts[:, basis]))[0][0]
-    p2 = tuple(touch_pts[index])
+        index = np.where(touch_pts[:, basis] == f(touch_pts[:, basis]))[0][0]
+        p2 = tuple(touch_pts[index])
 
-    pt = p1 if p1[basis] == f(p1[basis], p2[basis]) else p2
+        pt = p1 if p1[basis] == f(p1[basis], p2[basis]) else p2
 
     return pt
 

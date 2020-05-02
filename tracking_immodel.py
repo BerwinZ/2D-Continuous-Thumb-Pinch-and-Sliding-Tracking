@@ -30,13 +30,6 @@ if __name__ == '__main__':
         # Show image
         SHOW_IMAGE = True
 
-        # Optical FLow calculator
-        # opt_flow_up = OpticalFlowLK(IM_WIDTH, IM_HEIGHT, step=50)
-        # opt_flow_down = OpticalFlowLK(IM_WIDTH, IM_HEIGHT, step=50)
-
-        # Tracker to convert point movement in image coordinate to the draw board coordinate
-        # tracker = GeometryCalculator()
-
         kalman = KalmanFilter()
 
         # Drawing boards
@@ -84,8 +77,6 @@ if __name__ == '__main__':
             # 1.9 Show image
             # ---------------------------------------------
             if SHOW_IMAGE:
-                # image_joint = np.concatenate((bgr_image, finger_image), axis=1)
-                # dtl.draw_vertical_lines(image_joint, 1)
                 cv2.imshow('Finger', out_image)
 
             # ---------------------------------------------
