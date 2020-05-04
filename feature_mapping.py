@@ -2,6 +2,8 @@
 """
 import math
 from math import tan, sin, cos, pi
+cot = lambda x: 1 / tan(x)
+
 from math import degrees as degs
 from math import radians as rads
 
@@ -81,20 +83,18 @@ class ImmMapping:
         self.pt_g = [0, 0]
         self.__calc_middle_paras()
 
-        # self.test1()
+        self.test1()
         # self.test2()
         # self.test3()
 
     def test1(self):
-        # for im_len in np.arange(0, 2.4, 0.01):
-        #     print(im_len, degs(self.__func_r1_inv(im_len)))
+        for im_len in np.arange(0, 2.4, 0.01):
+            print(im_len, degs(self.__func_r1_inv(im_len)))
 
-        # print(degs(self.__func_r1_inv(6.15277325138172)))
-
-        for i in np.arange(0, 90, 0.5):
-            rad_val = rads(i)
-            b_val = self.__func_r1(rad_val)
-            print(i, round(degs(self.__func_r1_inv(b_val)), 1), b_val)
+        # for i in np.arange(0, 90, 0.5):
+            # rad_val = rads(i)
+            # b_val = self.__func_r1(rad_val)
+            # print(i, round(degs(self.__func_r1_inv(b_val)), 1), b_val)
     
     def test2(self):
         for im_len in np.arange(0, 3.2, 0.01):
@@ -166,18 +166,16 @@ class ImmMapping:
         Returns:
             (x, y)
         """
-        if x_gim is None or y_bim is None:
+        if x_gim is None or y_bim is None or y_iim is None:
             return None
 
-        self.aph1 = self.__func_r1_inv(kp2m * y_bim)
+        # self.aph1 = self.__func_r1_inv(kp2m * y_bim)
         self.aph2 = self.__func_r2_inv(kp2m * y_iim)
         self.beta = self.__func_h_inv(kp2m * x_gim) 
         
         x, y = 0, 0
-
-        x = - (d1 * sin(aph0 - self.aph1) + d2 * sin(aph0)) * self.beta
-        # y = - math.sqrt(d1**2 + d2**2 + 2*d1*d2*cos(self.aph1)) * (self.aph2 - self.aph2_0)
-        y = - d1 * (self.aph1 - self.aph1_0) - math.sqrt(d1**2 + d2**2 + 2*d1*d2*cos(self.aph1)) * (self.aph2 - self.aph2_0)
+        # x = - (d1 * sin(aph0 - self.aph1) + d2 * sin(aph0)) * self.beta
+        # y = - d1 * (self.aph1 - self.aph1_0) - math.sqrt(d1**2 + d2**2 + 2*d1*d2*cos(self.aph1)) * (self.aph2 - self.aph2_0)
   
         return x, y
     
@@ -204,7 +202,7 @@ class ImmMapping:
             aph2 -- rads of first knuckle (0 - pi/2)
         """
         equ = lambda x: self.__func_r2(x) - i
-        start_deg = 60
+        start_deg = 20
         return fsolve(equ, rads(start_deg))[0]
 
 
@@ -229,31 +227,34 @@ class ImmMapping:
 
         Returns:
             b -- vertical imaging length (0.2 - 2.1)
-        """
+        """       
+        cos_01 = cos(aph0 - aph1)
+        sin_01 = sin(aph0 - aph1)
+        pt_a3 = [pt_a1[0] + e * cos_01,
+                 pt_a1[1] - e * sin_01]
+        pt_a4 = [pt_a1[0] + d1 * cos_01,
+                 pt_a1[1] + d1 * sin_01]
 
-        cot = lambda x: 1 / tan(x)
-        # pt_c  = [0, 0]
-
-        pt_a3 = [pt_a1[0] + e * cos(aph1 - aph0),
-                 pt_a1[1] + e * sin(aph1 - aph0)]
-        pt_a4 = [pt_a1[0] + d1 * cos(aph0 - aph1),
-                 pt_a1[1] + d1 * sin(aph0 - aph1)]
-        base_a5 = tan(aph0 - aph1 - theta4) - tan(aph0 - aph1)
+        tan_014 = tan(aph0 - aph1 - theta4)
+        tan_01  = tan(aph0 - aph1)
+        base_a5 = tan_014 - tan_01
         pt_a5 = [
-        (tan(aph0-aph1-theta4) * pt_a4[0] - tan(aph0-aph1) * pt_a3[0] - pt_a4[1] + pt_a3[1]) / base_a5,
-        (tan(aph0-aph1-theta4) * tan(aph0-aph1) * (pt_a4[0]-pt_a3[0]) + tan(aph0-aph1-theta4) * pt_a3[1] - tan(aph0 - aph1) * pt_a4[1]) / base_a5]
+        (tan_014 * pt_a4[0] - tan_01 * pt_a3[0] - pt_a4[1] + pt_a3[1]) / base_a5,
+        (tan_014 * tan_01 * (pt_a4[0]-pt_a3[0]) + tan_014 * pt_a3[1] - tan_01 * pt_a4[1]) / base_a5]
 
         curve_slope = lambda p1, p2, p3, t: \
                         ((1-t)**2 * p1[1] + 2*t*(1-t) * p2[1] + t*t * p3[1]) / \
                         ((1-t)**2 * p1[0] + 2*t*(1-t) * p2[0] + t*t * p3[0])
+        
         #------------------------------------------------------------------------
         # Method 1 - Use point C, A5, A4 to make the curve
-        # pt_c[0] = (tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2))
-        # pt_c[1] = -(tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)) * cot(av / 2)
-        # func_L = lambda t: curve_slope(pt_c, pt_a5, pt_a4, t) 
+        pt_c = [
+            (tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)),
+            -(tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)) * cot(av / 2)]
+        func_L = lambda t: curve_slope(pt_c, pt_a5, pt_a4, t) 
         #------------------------------------------------------------------------
         # Method 2 - Use point A3, A5, A4 to make the curve
-        func_L = lambda t: curve_slope(pt_a3, pt_a5, pt_a4, t)
+        # func_L = lambda t: curve_slope(pt_a3, pt_a5, pt_a4, t)
         #------------------------------------------------------------------------
 
         t_list = np.arange(0, 1, 0.5)
@@ -276,7 +277,10 @@ class ImmMapping:
 
         # v = (f**2 + phi0**2 + self.i1*self.i2 - self.i1*phi0 - self.i2*phi0) * sin(self.aph2_1 - self.aph2_2) + f * (self.i1 - self.i2) * cos(self.aph2_1 - self.aph2_2)
 
-        return phi0 - f * (self.pt_i[0] * sin(aph2 + aph0) + self.pt_i[1] * cos(aph2 + aph0) + phi1) / (self.pt_i[0] * cos(aph2 + aph0) - self.pt_i[1] * sin(aph2 + aph0) + phi2)
+        sin_02 = sin(aph0 + aph2)
+        cos_02 = cos(aph0 + aph2)
+
+        return phi0 - f * (self.pt_i[0] * sin_02 + self.pt_i[1] * cos_02 + phi1) / (self.pt_i[0] * cos_02 - self.pt_i[1] * sin_02 + phi2)
 
 
     def __func_h(self, beta):
@@ -288,7 +292,9 @@ class ImmMapping:
         Returns:
             g -- horizontal imaging length (1.5 - 3)
         """
-        return psi1 + f * (self.pt_g[1] * tan(beta) - self.pt_g[0]) / (self.pt_g[0] * tan(beta) + self.pt_g[1] + psi2)
+        tan_b = tan(beta)
+
+        return psi1 + f * (self.pt_g[1] * tan_b - self.pt_g[0]) / (self.pt_g[0] * tan_b + self.pt_g[1] + psi2)
        
 
 class MknnMapping:

@@ -91,7 +91,7 @@ if __name__ == '__main__':
             # 3. User Input
             # ---------------------------------------------
             # if the user pressed ESC, then stop looping
-            keypress = cv2.waitKey(1) & 0xFF
+            keypress = cv2.waitKey(25) & 0xFF
             if keypress == 27:
                 break
             elif keypress == ord('c'):
