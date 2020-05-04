@@ -63,12 +63,13 @@ class ImmMapping:
         
         self.aph1_0 = 0.979071626956144   # require calibration
         
-        self.aph2_0 = rads(45)          # same with aph2_1
+        self.aph2_0 = rads(27)          # same with aph2_1
 
-        # self.aph2_1 = rads(35)                 
-        # self.aph2_2 = rads(45)              
-        self.aph2_1 = rads(45)                 
-        self.aph2_2 = rads(55)         
+        self.aph2_1 = rads(35)                 
+        self.aph2_2 = rads(45)              
+        # self.aph2_1 = rads(45)                 
+        # self.aph2_2 = rads(55)
+             
         self.i1 = 0.8                   # require calibration
         self.i2 = 0.42                  # require calibration
         # self.i1 = 1.24
@@ -83,18 +84,20 @@ class ImmMapping:
         self.pt_g = [0, 0]
         self.__calc_middle_paras()
 
-        self.test1()
+        # self.test1(func=self.__func_r1_inv)
         # self.test2()
-        # self.test3()
 
-    def test1(self):
+    def test1(self, func):
         for im_len in np.arange(0, 2.4, 0.01):
-            print(im_len, degs(self.__func_r1_inv(im_len)))
+            print(im_len, degs(func(im_len)))
 
         # for i in np.arange(0, 90, 0.5):
             # rad_val = rads(i)
-            # b_val = self.__func_r1(rad_val)
-            # print(i, round(degs(self.__func_r1_inv(b_val)), 1), b_val)
+            # if func == self.__func_r1_inv:
+            #     b_val = self.__func_r1(rad_val)
+            # elif func == self.__func_r2_inv:
+            #     b_val = self.__func_r2(rad_val)
+            # print(i, round(degs(func(b_val)), 1), b_val)
     
     def test2(self):
         for im_len in np.arange(0, 3.2, 0.01):
@@ -104,15 +107,6 @@ class ImmMapping:
         #     rad_val = rads(i)
         #     g_val = self.__func_h(rad_val)
         #     print(i, round(degs(self.__func_h_inv(g_val)), 1), g_val)
-
-    def test3(self):
-        for im_len in np.arange(0, 2.4, 0.01):
-            print(im_len, degs(self.__func_r2_inv(im_len)))
-
-        # for i in np.arange(0, 90, 0.5):
-            # rad_val = rads(i)
-            # b_val = self.__func_r2(rad_val)
-            # print(i, round(degs(self.__func_r2_inv(b_val)), 1), b_val)
 
     def calibrate(self, x_gim, y_bim, y_iim):
         print('Current calibration state:', self.c_state)
@@ -136,6 +130,9 @@ class ImmMapping:
         self.__calc_middle_paras()
 
     def __calc_middle_paras(self):
+
+        # v = (f**2 + phi0**2 + self.i1*self.i2 - self.i1*phi0 - self.i2*phi0) * sin(self.aph2_1 - self.aph2_2) + f * (self.i1 - self.i2) * cos(self.aph2_1 - self.aph2_2)
+
         def r2_pti(paras):
             xi, yi = paras
             return [
@@ -169,13 +166,13 @@ class ImmMapping:
         if x_gim is None or y_bim is None or y_iim is None:
             return None
 
-        # self.aph1 = self.__func_r1_inv(kp2m * y_bim)
+        self.aph1 = self.__func_r1_inv(kp2m * y_bim)
         self.aph2 = self.__func_r2_inv(kp2m * y_iim)
         self.beta = self.__func_h_inv(kp2m * x_gim) 
         
-        x, y = 0, 0
-        # x = - (d1 * sin(aph0 - self.aph1) + d2 * sin(aph0)) * self.beta
-        # y = - d1 * (self.aph1 - self.aph1_0) - math.sqrt(d1**2 + d2**2 + 2*d1*d2*cos(self.aph1)) * (self.aph2 - self.aph2_0)
+        # x, y = 0, 0
+        x = - (d1 * sin(aph0 - self.aph1) + d2 * sin(aph0)) * self.beta
+        y = - d1 * (self.aph1 - self.aph1_0) - math.sqrt(d1**2 + d2**2 + 2*d1*d2*cos(self.aph1)) * (self.aph2 - self.aph2_0)
   
         return x, y
     
@@ -257,7 +254,7 @@ class ImmMapping:
         # func_L = lambda t: curve_slope(pt_a3, pt_a5, pt_a4, t)
         #------------------------------------------------------------------------
 
-        t_list = np.arange(0, 1, 0.5)
+        t_list = np.arange(0, 1, 0.1)
         L_t_list = func_L(t_list)
         if max(L_t_list > 0):
             L_t_list = L_t_list[L_t_list > 0]    
@@ -274,9 +271,6 @@ class ImmMapping:
         Returns:
             i -- vertical imaging length 
         """
-
-        # v = (f**2 + phi0**2 + self.i1*self.i2 - self.i1*phi0 - self.i2*phi0) * sin(self.aph2_1 - self.aph2_2) + f * (self.i1 - self.i2) * cos(self.aph2_1 - self.aph2_2)
-
         sin_02 = sin(aph0 + aph2)
         cos_02 = cos(aph0 + aph2)
 

@@ -55,7 +55,7 @@ if __name__ == '__main__':
             # 1.1 Get the mask and its contour and apply the mask to image
             # ---------------------------------------------
             mask, contour, finger_image = threshold_masking(bgr_image)
-            out_image = finger_image.copy()
+            out_image = finger_image.copy() if SHOW_IMAGE else None
 
             # ---------------------------------------------
             # 1.2 Extract features
@@ -84,14 +84,14 @@ if __name__ == '__main__':
             # 2. Application
             # ---------------------------------------------
             # make the y scale larger, size: 300 - [4, 9]
-            board.update_dot(coord, scaler=[5 * 1.6, 7 * 1.6])
+            board.update_dot(coord, scaler=[5 * 1.6, 5 * 1.6])
             cv2.imshow('Drawboard', board.board)
 
             # ---------------------------------------------
             # 3. User Input
             # ---------------------------------------------
             # if the user pressed ESC, then stop looping
-            keypress = cv2.waitKey(25) & 0xFF
+            keypress = cv2.waitKey(1) & 0xFF
             if keypress == 27:
                 break
             elif keypress == ord('c'):
