@@ -66,12 +66,13 @@ if __name__ == '__main__':
             # 1.3 Feature Mapping and kalman filter
             # ---------------------------------------------
             if features is not None:
-                coord = model.predict(features[-2], features[-3])
-                # coord = model.predict(features[6] * 2, features[5] * 2)
-                # print(coord)
+                coord = model.predict(features[18], features[17], features[13])
                 coord = kalman.predict(coord)
             else:
                 coord = kalman.predict((0, 0))
+
+            # print(coord)
+
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -83,7 +84,7 @@ if __name__ == '__main__':
             # 2. Application
             # ---------------------------------------------
             # make the y scale larger, size: 300 - [4, 9]
-            board.update_dot(coord, scaler=[5 * 1.6, 9 * 1.6])
+            board.update_dot(coord, scaler=[5 * 1.6, 7 * 1.6])
             cv2.imshow('Drawboard', board.board)
 
             # ---------------------------------------------
@@ -95,7 +96,7 @@ if __name__ == '__main__':
                 break
             elif keypress == ord('c'):
                 if features is not None:
-                    model.calibrate(features[-2], features[-3])
+                    model.calibrate(features[18], features[17], features[13])
             elif keypress == ord('r'):
                 board.reset_board()
                 hor_board.reset_board()

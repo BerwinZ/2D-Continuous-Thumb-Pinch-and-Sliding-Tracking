@@ -422,6 +422,12 @@ def get_special_pt(contour, touch_pts, im_width, mode='lowest'):
             pt = (up[0] + bo[1] - up[1], (bo[1] + up[1]) // 2)
         else:
             pt = (up[0], (bo[1] + up[1]) // 2)
+        
+        # index = np.where(touch_pts[:, basis] == f(touch_pts[:, basis]))[0][0]
+        # p2 = tuple(touch_pts[index])
+
+        # pt = pt if pt[basis] == f(pt[basis], p2[basis]) else p2
+
     elif mode == 'lowest':
         index = np.where(contour[:, basis] == f(contour[:, basis]))[0][0]
         p1 = tuple(contour[index])
