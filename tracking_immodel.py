@@ -11,7 +11,7 @@ if __name__ == '__main__':
 
     import picamera_control
     from image_segment import threshold_masking
-    from feature_extraction import extract_features
+    from feature_extraction import extract_features_simple
     from feature_mapping import ImmMapping
 
     from math_tools import KalmanFilter
@@ -28,14 +28,14 @@ if __name__ == '__main__':
                                                                IM_HEIGHT,
                                                                FRAME_RATE=40)
         # Show image
-        SHOW_IMAGE = True
+        SHOW_IMAGE = False
 
         kalman = KalmanFilter()
 
         # Drawing boards
         DR_SIZE = 500
         # board = dtl.DrawBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=10)
-        board = dtl.TargetDotBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=10)
+        board = dtl.TargetDotBoard(DR_SIZE, DR_SIZE, RADIUS=10, MAX_POINTS=1)
 
         model = ImmMapping()
 
@@ -60,13 +60,13 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 1.2 Extract features
             # ---------------------------------------------
-            features = extract_features(contour, IM_HEIGHT, IM_WIDTH, out_image)
+            features = extract_features_simple(contour, IM_HEIGHT, IM_WIDTH, out_image)
 
             # ---------------------------------------------
             # 1.3 Feature Mapping and kalman filter
             # ---------------------------------------------
             if features is not None:
-                coord = model.predict(features[18], features[17], features[13])
+                coord = model.predict(features[0], features[1], features[2])
                 coord = kalman.predict(coord)
             else:
                 coord = kalman.predict((0, 0))
@@ -83,8 +83,8 @@ if __name__ == '__main__':
             # ---------------------------------------------
             # 2. Application
             # ---------------------------------------------
-            # make the y scale larger, size: 300 - [4, 9]
-            board.update_dot(coord, scaler=[5 * 1.6, 5 * 1.6])
+            # make the y scale larger
+            board.update_dot(coord, scaler=[8 * 1.6, 11 * 1.6])
             cv2.imshow('Drawboard', board.board)
 
             # ---------------------------------------------

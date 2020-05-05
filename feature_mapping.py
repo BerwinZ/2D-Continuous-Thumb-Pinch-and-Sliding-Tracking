@@ -59,7 +59,7 @@ class ImmMapping:
         self.aph2 = None
         self.beta = None
         
-        self.c_state = 'origin'
+        self.c_state = 'bottom'
         
         self.aph1_0 = 0.979071626956144   # require calibration
         
@@ -110,15 +110,7 @@ class ImmMapping:
 
     def calibrate(self, x_gim, y_bim, y_iim):
         print('Current calibration state:', self.c_state)
-        if self.c_state == 'origin':
-            self.aph1_0 = self.__func_r1_inv(kp2m * y_bim)
-            self.g1 = kp2m * x_gim
-            self.i1 = kp2m * y_iim
-            print('alpha1 origin rad:', self.aph1_0, 
-                  '\nimaging length g1:', self.g1, 
-                  '\nimaging length i1:', self.i1)
-            self.c_state = 'bottom'
-        elif self.c_state == 'bottom':
+        if self.c_state == 'bottom':
             self.i2 = kp2m * y_iim
             print('imaging length i2:', self.i2)
             self.c_state = 'left'
@@ -126,11 +118,25 @@ class ImmMapping:
             self.g2 = kp2m * x_gim
             print('imaging length g2:', self.g2)
             self.c_state = 'origin'
+        elif self.c_state == 'origin':
+            self.aph1_0 = self.__func_r1_inv(kp2m * y_bim)
+            self.aph2_0 = self.__func_r2_inv(kp2m * y_iim)
+            self.g1 = kp2m * x_gim
+            self.i1 = kp2m * y_iim
+            print('alpha1 origin rad:', self.aph1_0,
+                  '\nalpha1 origin rad:', self.aph2_0,
+                  '\nimaging length g1:', self.g1, 
+                  '\nimaging length i1:', self.i1)
+            self.c_state = 'bottom'
 
         self.__calc_middle_paras()
 
     def __calc_middle_paras(self):
+        """Calculate the middle paras of pt_i, and pt_g
 
+        Returns:
+            [type] -- [description]
+        """
         # v = (f**2 + phi0**2 + self.i1*self.i2 - self.i1*phi0 - self.i2*phi0) * sin(self.aph2_1 - self.aph2_2) + f * (self.i1 - self.i2) * cos(self.aph2_1 - self.aph2_2)
 
         def r2_pti(paras):
@@ -156,9 +162,9 @@ class ImmMapping:
         """Predict the coord
 
         Arguments:
-            x_gim {[type]} -- x of rightest index finger point
-            y_bim {[type]} -- y of lowest thumb point
-            y_iim {[type]} -- y of bottom left point
+            x_gim {tuple} -- x of rightest index finger point
+            y_bim {tuple} -- y of lowest thumb point
+            y_iim {tuple} -- y of bottom left point
 
         Returns:
             (x, y)
@@ -186,7 +192,7 @@ class ImmMapping:
             aph1 -- rads of first knuckle (0 - pi/2)
         """
         equ = lambda x: self.__func_r1(x) - b
-        start_deg = 0
+        start_deg = 20
         return fsolve(equ, rads(start_deg))[0]
 
     def __func_r2_inv(self, i):
@@ -245,9 +251,10 @@ class ImmMapping:
         
         #------------------------------------------------------------------------
         # Method 1 - Use point C, A5, A4 to make the curve
+        cot_av2 = cot(av / 2)
         pt_c = [
-            (tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)),
-            -(tan(aph0 - aph1) * pt_a3[0] - pt_a3[1]) / (tan(aph0 - aph1) + cot(av / 2)) * cot(av / 2)]
+             (tan_01 * pt_a3[0] - pt_a3[1]) / (tan_01 + cot_av2),
+            -(tan_01 * pt_a3[0] - pt_a3[1]) / (tan_01 + cot_av2) * cot_av2]
         func_L = lambda t: curve_slope(pt_c, pt_a5, pt_a4, t) 
         #------------------------------------------------------------------------
         # Method 2 - Use point A3, A5, A4 to make the curve
@@ -260,7 +267,7 @@ class ImmMapping:
             L_t_list = L_t_list[L_t_list > 0]    
         k_ob_star = min(L_t_list)
 
-        return f * (1 / k_ob_star + math.tan(av/2))
+        return f * (1 / k_ob_star + tan(av/2))
     
     def __func_r2(self, aph2):
         """i = r2(aph2)

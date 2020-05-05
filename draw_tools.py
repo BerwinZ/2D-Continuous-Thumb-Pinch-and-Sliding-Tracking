@@ -195,22 +195,33 @@ class TargetDotBoard:
             # check current dot position
             arrived = False
 
-            # wait 3 seconds
+            # wait the user touch the dot
             print('\n')
             print('-'*60)
             print("Target Dot Changed!")
             start_time = timeit.default_timer()
-            countdown = 5
-            while countdown > 0 and self.thread_sign:
-                print("Countdown:", countdown)
-                countdown -= 1
-                for i in range(1000):
-                    if not arrived and self.__check_arrive():
-                        print("Arrive!")
-                        arrived = True
-                        stop_time = timeit.default_timer()
-                    sleep(1e-3)
-            print("Countdown:", 0)
+            
+            # -------------------------------------------------------------
+            # 1. Have a countdown
+            # countdown = 5
+            # while countdown > 0 and self.thread_sign:
+            #     print("Countdown:", countdown)
+            #     countdown -= 1
+            #     for i in range(1000):
+            #         if not arrived and self.__check_arrive():
+            #             print("Arrive!")
+            #             arrived = True
+            #             stop_time = timeit.default_timer()
+            #         sleep(1e-3)
+            # print("Countdown:", 0)
+            # -------------------------------------------------------------
+            # 2. No countdown
+            while self.thread_sign and not arrived:
+                if self.__check_arrive():
+                    print("Arrived!")
+                    arrived = True
+                    stop_time = timeit.default_timer()
+                sleep(1e-3)
 
             # show result
             print('-'*60)
@@ -218,7 +229,7 @@ class TargetDotBoard:
                 print("Not arrived")
                 self.task_cost_time.append(None)
             else:
-                cost_time = round(stop_time-start_time,2)
+                cost_time = round(stop_time-start_time, 2)
                 print("Arrive in", cost_time, 'seconds')
                 self.task_cost_time.append(cost_time)
             
@@ -226,6 +237,11 @@ class TargetDotBoard:
         
         print("Task finished. Cost time is")
         print(self.task_cost_time)
+        
+        print('-'*60)
+        print("Mean cost time:")
+        print(np.mean(self.task_cost_time))
+        print('-'*60)
 
     def __generate_target_dot(self, offset = 100):
         x = random.randint(0 + offset, self.width - 1 - offset)

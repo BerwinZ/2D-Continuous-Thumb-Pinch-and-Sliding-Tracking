@@ -24,6 +24,74 @@ import numpy as np
 import cv2
 import draw_tools as dtl
 
+
+def extract_features_simple(contour, im_height, im_width, output_image):
+    """Extract 3 features used for imaging model
+
+    Arguments:
+        contour {[type]} -- [description]
+        im_height {[type]} -- [description]
+        im_width {[type]} -- [description]
+        output_image {[type]} -- [description]
+    """
+    # ---------------------------------------------
+    # 1.1 Get 2 defect points
+    # ---------------------------------------------
+    # dft_pts, _ = get_defect_points(contour,
+    #                                     MIN_VALID_CONT_AREA=100000,
+    #                                     MIN_DEFECT_DISTANCE=5000)
+    dft_pts, _ = get_defect_points(contour)
+
+    # ---------------------------------------------
+    # 1.2 Divide up and down finger contour
+    # ---------------------------------------------
+    thumb_cnt, index_cnt = segment_diff_fingers(contour, dft_pts)
+
+    # ---------------------------------------------
+    # 1.3 Get 4 boundary points
+    # ---------------------------------------------
+    top_left, top_right, bottom_left, _ = get_boundary_points(
+        thumb_cnt, index_cnt, im_height, im_width, mask=[1,1,1,0])
+
+    # ---------------------------------------------
+    # 1.4 Get touch line, then lowest thumb point and rightest index finger point
+    # ---------------------------------------------
+    _, _, thumb_touch_pts = get_touch_line_curve(
+        is_thumb=True,
+        contour=thumb_cnt,
+        bound_points=(top_left, top_right),
+        fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 2)),
+        defect_points=dft_pts)
+
+    index_touch_pts = [(0, 0)] if thumb_touch_pts is not None else None
+
+    lowest_thumb   = get_special_pt(thumb_cnt, thumb_touch_pts, im_width, 'lowest')
+    rightest_index = get_special_pt(index_cnt, index_touch_pts, im_width, 'rightest')
+
+    # ---------------------------------------------
+    # 1.5 Check None and form the feature data
+    # ---------------------------------------------
+    if bottom_left is None or lowest_thumb is None or rightest_index is None:
+        return None
+    else:
+        features = np.array([
+            rightest_index[0], lowest_thumb[1], bottom_left[1] 
+        ])
+
+    # ---------------------------------------------
+    # 1.6 If show the points
+    # ---------------------------------------------
+    if output_image is not None:
+        # dtl.draw_contours(output_image, thumb_cnt, color=[255, 0, 0])
+        # dtl.draw_contours(output_image, index_cnt, color=[0, 0, 255])
+        # Two defect points (Green), centroid points (Blue), boundary points (Green-blue)
+        dtl.draw_points(output_image, bottom_left, radius=10, color=[0, 255, 255])
+        dtl.draw_points(output_image, lowest_thumb, radius=10, color=[0, 255, 255])
+        dtl.draw_points(output_image, rightest_index, radius=10, color=[0, 255, 255])
+    
+    return features
+
+
 def extract_features(contour, im_height, im_width, output_image=None):
     """Extract features
 
@@ -63,14 +131,15 @@ def extract_features(contour, im_height, im_width, output_image=None):
     # 1.4 Get touch line, then lowest thumb point and rightest index finger point
     # ---------------------------------------------
     _, _, thumb_touch_pts = get_touch_line_curve(
-        IS_UP=True,
+        is_thumb=True,
         contour=thumb_cnt,
         bound_points=(top_left, top_right),
         fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 2)),
         defect_points=dft_pts)
 
+    # index_touch_pts = [(0, 0)] if thumb_touch_pts is not None else None
     _, _, index_touch_pts = get_touch_line_curve(
-        IS_UP=False,
+        is_thumb=False,
         contour=index_cnt,
         bound_points=(bottom_left, bottom_right),
         fitting_curve=lambda X, Y: np.poly1d(np.polyfit(X, Y, 3)),
@@ -179,12 +248,15 @@ def segment_diff_fingers(contour, defect_points):
     d2 = np.linalg.norm(contour[:, 0, :] - np.array(defect_points[1]),
                         axis=1)
 
-    idx_left = np.where(d1 == min(d1))[0][0]
+    idx_left  = np.where(d1 == min(d1))[0][0]
     idx_right = np.where(d2 == min(d2))[0][0]
 
     thumb_cnt = np.concatenate((contour[:idx_left+1],
                                 contour[idx_right:]))
     index_cnt = contour[idx_left:idx_right+1]
+
+    thumb_cnt = thumb_cnt if len(thumb_cnt) > 0 else None
+    index_cnt = index_cnt if len(index_cnt) > 0 else None
 
     return thumb_cnt, index_cnt
 
@@ -221,8 +293,8 @@ def add_touch_line_to_contour(is_up, contour, defect_points, touch_line):
 
     return contour
 
-# TODO: some error here, 179938 image in step=2 dataset
-def get_boundary_points(up_contour, down_contour, height, width):
+
+def get_boundary_points(up_contour, down_contour, height, width, mask=[1,1,1,1]):
     """Get the four boundary points of the hand contour
     
     Arguments:
@@ -230,6 +302,7 @@ def get_boundary_points(up_contour, down_contour, height, width):
         down_contour {[type]} -- [description]
         height {[type]} -- [description]
         width {[type]} -- [description]
+        mask {list} -- indicate whether calculate the corresponding element
     
     Returns:
         Boundary Points [list of tuple] -- [top_left, top_right, bottom_left, bottom_right]
@@ -256,23 +329,35 @@ def get_boundary_points(up_contour, down_contour, height, width):
                'left' : [0, 0],
                'right': [0, width-1]}
 
-    top_left = get_pt(up_cnt, bd_dict['left'], mode_dict['lowest'])
-    if top_left is None:
-        top_left = get_pt(up_cnt, bd_dict['top'], mode_dict['leftest'])
+    if mask[0]:
+        top_left = get_pt(up_cnt, bd_dict['left'], mode_dict['lowest'])
+        if top_left is None:
+            top_left = get_pt(up_cnt, bd_dict['top'], mode_dict['leftest'])
+    else:
+        top_left = None
 
-    top_right = get_pt(up_cnt, bd_dict['right'], mode_dict['lowest'])
-    if top_right is None:
-        top_right = get_pt(up_cnt, bd_dict['top'], mode_dict['rightest'])
-    
-    bottom_left = get_pt(down_cnt, bd_dict['left'], mode_dict['upest'])
-    if bottom_left is None:
-        bottom_left = get_pt(down_cnt, bd_dict['down'], mode_dict['leftest'])
+    if mask[1]:
+        top_right = get_pt(up_cnt, bd_dict['right'], mode_dict['lowest'])
+        if top_right is None:
+            top_right = get_pt(up_cnt, bd_dict['top'], mode_dict['rightest'])
+    else:
+        top_right = None
 
-    bottom_right = get_pt(down_cnt, bd_dict['right'], mode_dict['upest'])
-    if bottom_right is None:
-        bottom_right = get_pt(down_cnt, bd_dict['down'], mode_dict['rightest'])
-    if bottom_right is None:
-        bottom_right = get_pt(down_cnt, bd_dict['left'], mode_dict['lowest'])
+    if mask[2]:
+        bottom_left = get_pt(down_cnt, bd_dict['left'], mode_dict['upest'])
+        if bottom_left is None:
+            bottom_left = get_pt(down_cnt, bd_dict['down'], mode_dict['leftest'])
+    else:
+        bottom_left = None
+
+    if mask[3]:
+        bottom_right = get_pt(down_cnt, bd_dict['right'], mode_dict['upest'])
+        if bottom_right is None:
+            bottom_right = get_pt(down_cnt, bd_dict['down'], mode_dict['rightest'])
+        if bottom_right is None:
+            bottom_right = get_pt(down_cnt, bd_dict['left'], mode_dict['lowest'])
+    else:
+        bottom_right = None
 
     return top_left, top_right, bottom_left, bottom_right
 
@@ -296,7 +381,7 @@ def get_centroid(contour):
     else:
         return None
 
-def get_touch_line_curve(IS_UP,
+def get_touch_line_curve(is_thumb,
                      contour,
                      bound_points,
                      fitting_curve,
@@ -305,7 +390,7 @@ def get_touch_line_curve(IS_UP,
     """Fit the up contour with polyfit using the points of the contour within the bound points
     
     Arguments:
-        IS_UP {bool} -- [description]
+        is_thumb {bool} -- [description]
         contour {[type]} -- [description]
         bound_points {[type]} -- [description]
         fitting_curve {[type]} -- [description]
@@ -335,7 +420,7 @@ def get_touch_line_curve(IS_UP,
     contour = np.reshape(contour, (contour.shape[0], 2))
     theta = None
 
-    if IS_UP:
+    if is_thumb:
         f = lambda x, y: (y2 - y1) / (x2 - x1) * (x - x1) - (y - y1)
         contour = contour[f(contour[:, 0], contour[:, 1]) < 0]
     else:
@@ -370,7 +455,7 @@ def get_touch_line_curve(IS_UP,
     # Joint
     points = np.concatenate((p_x, p_y), axis=1)
 
-    if not IS_UP:
+    if not is_thumb:
         rotate = __rotate_array(-theta)
         points = rotate.dot(points.T).T
 
@@ -378,7 +463,7 @@ def get_touch_line_curve(IS_UP,
 
     if draw_image is not None:
         # Draw the points used to fit
-        color = [0, 0, 255] if IS_UP else [255, 0, 0]
+        color = [0, 0, 255] if is_thumb else [255, 0, 0]
         dtl.draw_points(draw_image, contour.astype("int"), radius=3, color=color)
         dtl.draw_points(draw_image, points, radius=3, color=color)
 
