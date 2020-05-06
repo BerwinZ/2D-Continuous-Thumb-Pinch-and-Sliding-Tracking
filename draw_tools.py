@@ -102,7 +102,7 @@ class DrawBoard:
         """Reset the board to all 0 array
         """
         self.board = self.board * 0
-        self.pts_queue = []
+        # self.pts_queue = []
 
     def update_dot(self, point, middle=True, scaler=[1, 1]):
         """Draw points on the board
@@ -174,7 +174,9 @@ class TargetDotBoard:
         self.board = self.drawboard.board
 
     def start(self):
+        self.target_count = 10
         self.thread_sign = True
+        self.task_cost_time = []
         threading.Thread(target=self.__task).start()
     
     def stop(self):
@@ -222,6 +224,7 @@ class TargetDotBoard:
                     arrived = True
                     stop_time = timeit.default_timer()
                 sleep(1e-3)
+            # ---------------------------------------------------------------
 
             # show result
             print('-'*60)
@@ -235,6 +238,8 @@ class TargetDotBoard:
             
             sleep(1)
         
+        self.target_pos = None
+        self.drawboard.reset_board()
         print("Task finished. Cost time is")
         print(self.task_cost_time)
         

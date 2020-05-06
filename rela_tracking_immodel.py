@@ -1,5 +1,5 @@
 """
-Track the finger motion with finger imaging model
+Track the finger's relative motion with finger imaging model
 """
 
 
@@ -26,12 +26,22 @@ if __name__ == '__main__':
         camera, rawCapture = picamera_control.configure_camera(IM_WIDTH,
                                                                IM_HEIGHT,
                                                                FRAME_RATE=40)
-        # Show image
+        # Show image flag
         SHOW_IMAGE = False
 
         # Mapping model
         model = ImmMapping()
 
+        # Start pos
+        ini_touch_pos = None
+        dlt_touch_vec = (0, 0)
+
+        ini_board_pos = (0, 0)
+        cur_board_pos = (0, 0)
+
+        wait_frame = 2
+
+        # Filter
         kalman = KalmanFilter()
 
         # Drawing boards
@@ -65,12 +75,34 @@ if __name__ == '__main__':
             # ---------------------------------------------
             if features is not None:
                 coord = model.predict(features[0], features[1], features[2])
-                coord = kalman.predict(coord)
-            else:
-                coord = kalman.predict((0, 0))
-
+                k_coord = kalman.predict(coord)
             # print(coord)
 
+            # ---------------------------------------------
+            # 1.4 Calculate relative move
+            # ---------------------------------------------
+            if features is None:
+                if ini_touch_pos is not None:
+                    ini_board_pos = cur_board_pos
+
+                ini_touch_pos = None
+                dlt_touch_vec = (0, 0)
+                wait_frame = 2
+            else:
+                if wait_frame >= 0:
+                    wait_frame -= 1
+                else:
+                    if ini_touch_pos is None:
+                        ini_touch_pos = k_coord
+                        dlt_touch_vec = (0, 0)
+                    else:
+                        dlt_touch_vec = (k_coord[0] - ini_touch_pos[0],
+                                         k_coord[1] - ini_touch_pos[1])
+            
+            cur_board_pos = (ini_board_pos[0] + dlt_touch_vec[0],
+                             ini_board_pos[1] + dlt_touch_vec[1])
+
+            # print(cur_board_pos)
 
             # ---------------------------------------------
             # 1.9 Show image
@@ -82,7 +114,7 @@ if __name__ == '__main__':
             # 2. Application
             # ---------------------------------------------
             # make the y scale larger
-            board.update_dot(coord, scaler=[8 * 1.6, 11 * 1.6])
+            board.update_dot(cur_board_pos, scaler=[8 * 1.6, 11 * 1.6])
             cv2.imshow('Drawboard', board.board)
 
             # ---------------------------------------------
@@ -93,8 +125,7 @@ if __name__ == '__main__':
             if keypress == 27:
                 break
             elif keypress == ord('c'):
-                if features is not None:
-                    model.calibrate(features[18], features[17], features[13])
+                ini_board_pos = (0, 0) 
             elif keypress == ord('r'):
                 board.reset_board()
                 hor_board.reset_board()
