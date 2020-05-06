@@ -19,36 +19,27 @@ This repo is used to track the thumb's touch position relative to other fingerti
     ```
 4. Run the script by
     ```Bash
-    python3 tracking_models.py 
+    python3 tracking_immodel.py 
     ```
 
-## Raspberry Pi Folder
+## Functions of scripts
 
-pi@192.168.137.209:/home/pi/mcrpnh
-
-## Scripts Analysis
-
-### Scripts Description
-
- Script | Content |
---------|----------
-draw_tools.py | draw points in a board to indicate the movements, and some useful drawing functions
-math_tools.py | math calculations
-feature_extraction.py | methods that is realted to contours
-picamera_control.py | configure the pi camera and get raw image data (BGR)
-coord_calculator.py | transferred the movements of tracked feature points to the movements of finger's real movements
-segment_hbp.py | segment the hand part from the image with histogram backprojection method
-image_segment.py | segment the hand part from the image with otsu thresholding method
-tracking_defect.py | track the touch point with convexcity defects from the contour of segmented finger
-tracking_bound.py | track the boundary points from the up and down finger contour
-tracking_geometry.py | track the points in some geometric features
-tracking_bound.py | track features with a model
-
-
-### Pipeline
-
-TBD
-
+ Script                 | Content |
+------------------------|------------------------------
+draw_tools.py           | drawing board, user experiments board, and some useful drawing functions
+math_tools.py           | math calculations, kalman filter
+picamera_control.py     | configure the pi camera and get raw image data in BGR format
+image_segment.py        | segment the hand part from the image with otsu thresholding method
+feature_extraction.py   | functions to extract features from contour of fingers
+feature_mapping.py      | classes to map feature data to pose coordinate
+train_knn_models.py     | train the knn models
+train_re_models.py      | train random forest models
+train_re_models_win.ipynb       | train random forest models. Run in `Windows` 
+prepare_fea_data_pca_win.ipynb  | process generated image and build a feature dataset. Use PCA. Run in `Windows`
+tracking_knnmodel.py    | tracking demo using the PCA and KNN
+tracking_rfmodel.py     | tracking demo using random forest regression model
+**tracking_immodel.py**     | tracking demo using imaging model. User experiment using absolute pose coordinate tracking
+**rela_tracking_immodel.py** | user experiment using relative motion tracking
 
 ## Reference
 
