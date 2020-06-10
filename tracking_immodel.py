@@ -2,7 +2,6 @@
 Track the finger motion with finger imaging model
 """
 
-
 if __name__ == '__main__':
     import cv2
     import numpy as np
